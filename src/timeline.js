@@ -52,7 +52,12 @@ async function parseTimeline(response){
 
   parser.addCaseParser('type', {
     '.js-comment-body': "comment",
-    '.TimelineItem-badge': "event"
+    // event type -> svg class
+    'svg.octicon-tag': "tag",
+    'svg.octicon-milestone': "milestone",
+    'svg.octicon-repo-push': "repo-push",
+    'svg.octicon-eye': "eye",
+    'svg.octicon-cross-reference': "cross-reference",
   })
 
   parser.addTextParser('author', '[data-hovercard-type="user"]')
@@ -76,7 +81,7 @@ async function parseTimeline(response){
   parser.addTextParser('reactionsCount', '.comment-reactions-options span');
 
   // events
-  parser.addTextParser('text','.TimelineItem[id^="event"]');
+  parser.addTextParser('text','[class="TimelineItem-body"]');
 
   let res = await parser.parse(response)
 
