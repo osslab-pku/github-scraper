@@ -25,7 +25,7 @@ async function parseTimeline(response){
   parser.addTextParser('author', '.gh-header-meta [data-hovercard-type="user"]', 'global')
   parser.addAttributeParser('actedAt', '.gh-header-meta relative-time', 'datetime', 'global');
 
-  parser.addAttributeParser('base', '.gh-header-meta .base-ref', 'title', 'global')
+  parser.addAttributeParser('base', '.gh-header-meta .commit-ref:not(.head-ref)', 'title', 'global')
   parser.addAttributeParser('head', '.gh-header-meta .head-ref', 'title', 'global')
 
   parser.addAttributeParser('labels', '.js-discussion-sidebar-item a.IssueLabel',
@@ -53,17 +53,23 @@ async function parseTimeline(response){
   parser.addCaseParser('type', {
     '.js-comment-body': "comment",
     // event type -> svg class
-    'svg.octicon-tag': "tag",
+    // '.TimelineItem-badge': "event",  // unknown event
+    'svg.octicon-tag': "label",
     'svg.octicon-milestone': "milestone",
-    'svg.octicon-repo-push': "repo-push",
-    'svg.octicon-eye': "eye",
-    'svg.octicon-cross-reference': "cross-reference",
+    'svg.octicon-repo-push': "push",
+    'svg.octicon-eye': "review",
+    'svg.octicon-cross-reference': "reference",
     'svg.octicon-file-diff': "file-diff",
     'svg.octicon-git-pull-request-closed': "close",
-    'svg.octicon-git-branch': "branch"
+    'svg.octicon-git-merge': "merge",
+    'svg.octicon-git-branch': "branch",
+    'svg.octicon-git-commit': "commit",
+    'svg.octicon-issue-closed': "close",
+    'svg.octicon-pencil': "edit",
+    'svg.octicon-x': "blocked"
   })
 
-  parser.addTextParser('author', '[data-hovercard-type="user"]')
+  parser.addTextParser('author', '.author[data-hovercard-type="user"]')
   parser.addTextParser('bot', '.author:not([data-hovercard-type="user"])')
   parser.addAttributeParser('actedAt', 'relative-time', 'datetime');
   parser.addAttributeParser('actedAt', 'time-ago', 'datetime');
@@ -80,7 +86,10 @@ async function parseTimeline(response){
   })
   parser.addTextParser('mentionedUsers', '.comment-body .user-mention');
   parser.addAttributeParser('mentionedLinks', '.comment-body a[href^="http"]', 'href');
+  // images cached by GitHub
   parser.addAttributeParser('mentionedImages', 'img[data-canonical-src]', 'data-canonical-src');
+  // not a user avatar
+  parser.addAttributeParser('mentionedImages', 'img:not([data-canonical-src]):not([src*="https://avatars.githubusercontent.com"])', 'src');
 
   // parser.addAttributeParser('reactions', '.comment-reactions-options > button', 'aria-label');
   parser.addTextParser('reactions', '.comment-reactions-options g-emoji');
@@ -98,14 +107,20 @@ async function parseTimeline(response){
   res = fieldMap(res, 'id', v => v[0].trim().substring(1));
   res = fieldMap(res, 'author', v => v[0].trim())
   res = fieldMap(res, 'bot', v => v[0].trim())
+
+  res = fieldMap(res, 'head', v => v[0].trim())
+  res = fieldMap(res, 'base', v => v[0].trim())
+
   res = fieldMap(res, 'authorLabels', v => v.map(t => t.trim()))
   res = fieldMap(res, 'labels', v => v.map(t => t.trim()))
+
   res = fieldMap(res, 'actedAt', v => v[0])
   res = fieldMap(res, 'text', v => v.map(t => t.trim()).join(' ').trim().replace('\n', ''))
   res = fieldMap(res, 'title', v => v[0])
   res = fieldMap(res, 'state', v => v[0])
   res = fieldMap(res, 'type', v => v[0])
   res = fieldMap(res, 'isEdited', v => v[0])
+
   res = fieldMap(res, 'mentionedUsers', v => v.map(t => t.trim().substring(1)))
 
   res = fieldMap(res, 'reactions', (v, k) => {
@@ -114,7 +129,6 @@ async function parseTimeline(response){
 
   // remove unnecessary fields
   res = fieldMap(res, 'reactionsCount', () => undefined);
-  delete res['$keyIsNull'];
 
   return res;
 }
@@ -146,7 +160,7 @@ export async function handleTimeline(request){
 
   for(let entry in res){
     ret["data"].push({
-      "eventId": entry,
+      "itemId": entry,
       ...res[entry]
     })
   }
