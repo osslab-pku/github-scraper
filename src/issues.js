@@ -88,10 +88,10 @@ async function parseIssues(response) {
   res = fieldMap(res, 'state', v => v.join(''));
   res = fieldMap(res, 'labels', v => v.map(t => t.trim()));
 
-  //parse check text
+  // parse check text
   res = fieldMap(res, 'check', v => {
     const matches = v.match(/(\d+)/g)
-    if (matches.length === 2) {
+    if (matches && matches.length === 2) {
       if (matches[0] === matches[1]) {
         return {
           "status": "passed",
@@ -105,9 +105,10 @@ async function parseIssues(response) {
           "passed": matches[0]
         }
       }
-    } else return {};
+    } else return {
+      "unknown": v
+    };
   });
-
   return res;
 }
 

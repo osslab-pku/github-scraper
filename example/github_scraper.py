@@ -63,14 +63,8 @@ class GithubScraperClient:
                 self._logger.error(
                     f"{e}: retrying {self._num_retries-retries+1}/{self._num_retries}"
                 )
-                # failed, return current list
-                if retries == 0:
-                    self._logger.error(
-                        f"fetch {url} {params} failed after {self._num_retries} retries"
-                    )
-                    break
                 # hit rate limit, sleep and retry
-                elif "too many requests" in str(e).lower():
+                if "too many requests" in str(e).lower():
                     retries -= 1
                     await asyncio.sleep(10)
                 # not found, skip this page
@@ -90,6 +84,12 @@ class GithubScraperClient:
             if has_next:
                 retries = self._num_retries
                 params["fromPage"] = int(data["current"]) + 1
+
+        # failed, return current list
+        if retries == 0:
+            self._logger.error(
+                f"fetch {url} {params} failed after {self._num_retries} retries"
+            )
 
         return all_res
 
@@ -214,13 +214,13 @@ class GithubScraperClient:
         self.get_all_with_callback(url, queries, callback)
 
     def get_issues_with_callback(
-        self, issues_list: List[Tuple[str, int]], callback: Callable[[Dict, Dict], Any]
+        self, issues_list: List[Tuple[str, int]], callback: Callable[[List, Dict], Any]
     ) -> None:
         """
         fetch a repo's issue and execute a callback on it.
         :param issues_list: the list of issues [(repo, number)]
         :param number: the issue number to fetch
-        :param callback: the callback to execute on the issue (result: dict, params: dict) -> None
+        :param callback: the callback to execute on the issue (results: list, params: dict) -> None
         """
         url = f"{self._baseurl}/issue"
         queries = [
@@ -235,13 +235,13 @@ class GithubScraperClient:
         self.get_all_with_callback(url, queries, callback)
 
     def get_pulls_with_callback(
-        self, pulls_list: List[Tuple[str, int]], callback: Callable[[Dict, Dict], Any]
+        self, pulls_list: List[Tuple[str, int]], callback: Callable[[List, Dict], Any]
     ) -> None:
         """
         fetch a repo's pull request and execute a callback on it.
         :param pulls_list: the list of pulls [(repo, number)]
         :param number: the pull request number to fetch
-        :param callback: the callback to execute on the pull request (result: dict, params: dict) -> None
+        :param callback: the callback to execute on the issue (results: list, params: dict) -> None
         """
         url = f"{self._baseurl}/pull"
         queries = [

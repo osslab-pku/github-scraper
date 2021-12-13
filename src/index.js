@@ -36,6 +36,7 @@ async function handleRequest(request) {
     }
   } catch (e) {
     // throw e;
+    console.log(e);
     return generateErrorResponse(e);
   }
 }
