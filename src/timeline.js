@@ -58,10 +58,13 @@ async function parseTimeline(response){
     'svg.octicon-repo-push': "repo-push",
     'svg.octicon-eye': "eye",
     'svg.octicon-cross-reference': "cross-reference",
+    'svg.octicon-file-diff': "file-diff"
   })
 
   parser.addTextParser('author', '[data-hovercard-type="user"]')
+  parser.addTextParser('bot', '.author:not([data-hovercard-type="user"])')
   parser.addAttributeParser('actedAt', 'relative-time', 'datetime');
+  parser.addAttributeParser('actedAt', 'time-ago', 'datetime');
 
   // comments
   parser.addTextParser('authorLabels', '.timeline-comment-header .Label')
@@ -82,25 +85,33 @@ async function parseTimeline(response){
 
   // events
   parser.addTextParser('text','[class="TimelineItem-body"]');
+  // file diff comment (request change)
+  parser.addTextParser('text','.TimelineItem-body.flex-md-row.flex-column .flex-md-self-center');
+  parser.addAttributeParser('labels', '[class="TimelineItem-body"] a.IssueLabel', 'data-name');
 
   let res = await parser.parse(response)
 
   // transform
   res = fieldMap(res, 'id', v => v[0].trim().substring(1));
   res = fieldMap(res, 'author', v => v[0].trim())
+  res = fieldMap(res, 'bot', v => v[0].trim())
   res = fieldMap(res, 'authorLabels', v => v.map(t => t.trim()))
   res = fieldMap(res, 'labels', v => v.map(t => t.trim()))
   res = fieldMap(res, 'actedAt', v => v[0])
-  res = fieldMap(res, 'text', v => v.map(t => t.trim()).join(' ').trim())
+  res = fieldMap(res, 'text', v => v.map(t => t.trim()).join(' ').trim().replace('\n', ''))
   res = fieldMap(res, 'title', v => v[0])
   res = fieldMap(res, 'state', v => v[0])
   res = fieldMap(res, 'type', v => v[0])
   res = fieldMap(res, 'isEdited', v => v[0])
+  res = fieldMap(res, 'mentionedUsers', v => v.map(t => t.trim().substring(1)))
 
   res = fieldMap(res, 'reactions', (v, k) => {
     return zip(v, res[k]['reactionsCount']);
   })
+
+  // remove unnecessary fields
   res = fieldMap(res, 'reactionsCount', () => undefined);
+  delete res['$keyIsNull'];
 
   return res;
 }
