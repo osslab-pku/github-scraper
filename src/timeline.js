@@ -159,6 +159,10 @@ export async function handleTimeline(request){
   const ret = { "data": [], "url": reqURL };
 
   for(let entry in res){
+    if(entry === "$keyIsNull") {
+      ret["uncollected"] = res[entry];
+      continue;
+    }
     ret["data"].push({
       "itemId": entry,
       ...res[entry]

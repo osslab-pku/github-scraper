@@ -41,7 +41,8 @@ async function parseIssues(response) {
   // set title
   parser.addTextParser('title','.markdown-title');
   // set author
-  parser.addTextParser('author', '[data-hovercard-type="user"]');
+  parser.addTextParser('author', '.opened-by [data-hovercard-type="user"]');
+  parser.addTextParser('bot', '.opened-by a[href]:not([data-hovercard-type="user"])')
   // set actedAt
   parser.addAttributeParser('actedAt', 'relative-time', 'datetime');
 
@@ -77,9 +78,10 @@ async function parseIssues(response) {
   // transform results
   res = fieldMap(res, 'title', v => v.join(''));
   res = fieldMap(res, 'author', v => v.join(''));
+  res = fieldMap(res, 'bot', v => v.join(''));
   res = fieldMap(res, 'actedAt', v => v.join(''));
-  res = fieldMap(res, 'check', v => v.join(''))
-  res = fieldMap(res, 'checkStatus', v => v.join(''))
+  res = fieldMap(res, 'check', v => v.join(''));
+  res = fieldMap(res, 'checkStatus', v => v.join(''));
   res = fieldMap(res, 'next', v => v.join(''));
   res = fieldMap(res, 'total', v => v.join(''));
   res = fieldMap(res, 'current', v => v.join(''));
@@ -158,6 +160,10 @@ export async function handleIssues(request){
 
   for(let entry in full_res){
     if(entry === "pagination") continue;
+    if(entry === "$keyIsNull") {
+      ret["uncollected"] = full_res[entry];
+      continue;
+    }
     ret["data"].push({
       "id": entry,
       ...full_res[entry]
