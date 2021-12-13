@@ -58,7 +58,9 @@ async function parseTimeline(response){
     'svg.octicon-repo-push': "repo-push",
     'svg.octicon-eye': "eye",
     'svg.octicon-cross-reference': "cross-reference",
-    'svg.octicon-file-diff': "file-diff"
+    'svg.octicon-file-diff': "file-diff",
+    'svg.octicon-git-pull-request-closed': "close",
+    'svg.octicon-git-branch': "branch"
   })
 
   parser.addTextParser('author', '[data-hovercard-type="user"]')
@@ -78,13 +80,14 @@ async function parseTimeline(response){
   })
   parser.addTextParser('mentionedUsers', '.comment-body .user-mention');
   parser.addAttributeParser('mentionedLinks', '.comment-body a[href^="http"]', 'href');
+  parser.addAttributeParser('mentionedImages', 'img[data-canonical-src]', 'data-canonical-src');
 
   // parser.addAttributeParser('reactions', '.comment-reactions-options > button', 'aria-label');
   parser.addTextParser('reactions', '.comment-reactions-options g-emoji');
   parser.addTextParser('reactionsCount', '.comment-reactions-options span');
 
   // events
-  parser.addTextParser('text','[class="TimelineItem-body"]');
+  parser.addTextParser('text','[class="TimelineItem-body"] div:first-of-type');
   // file diff comment (request change)
   parser.addTextParser('text','.TimelineItem-body.flex-md-row.flex-column .flex-md-self-center');
   parser.addAttributeParser('labels', '[class="TimelineItem-body"] a.IssueLabel', 'data-name');
@@ -137,5 +140,16 @@ export async function handleTimeline(request){
 
   const response = await fetchURL(reqURL);
   const res = await parseTimeline(response);
-  return generateJSONResponse(res);
+
+  // transform
+  const ret = { "data": [], "url": reqURL };
+
+  for(let entry in res){
+    ret["data"].push({
+      "eventId": entry,
+      ...res[entry]
+    })
+  }
+
+  return generateJSONResponse(ret);
 }

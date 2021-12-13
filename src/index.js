@@ -27,7 +27,7 @@ async function handleRequest(request) {
       return await handleIssues(request);
     } else if (urlObj.pathname === "/issue" || urlObj.pathname === "/pull" ) {
       return await handleTimeline(request);
-    } else if (urlObj.pathname === "ip"){
+    } else if (urlObj.pathname === "/ip"){
       return await handleIP(request);
     } else {
       return generateJSONResponse({
