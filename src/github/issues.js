@@ -95,14 +95,14 @@ async function parseIssues(response) {
       if (matches[0] === matches[1]) {
         return {
           "status": "passed",
-          "total": matches[1],
-          "passed": matches[0]
+          "total": parseInt(matches[1]),
+          "passed": parseInt(matches[0])
         }
       } else {
         return {
           "status": "failed",
-          "total": matches[1],
-          "passed": matches[0]
+          "total": parseInt(matches[1]),
+          "passed": parseInt(matches[0])
         }
       }
     } else return {
@@ -166,7 +166,7 @@ export async function handleIssues(request){
       continue;
     }
     ret["data"].push({
-      "id": entry,
+      "id": parseInt(entry),
       ...full_res[entry]
     })
   }
