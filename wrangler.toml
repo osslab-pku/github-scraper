@@ -1,4 +1,4 @@
-name = "github-scraper"
+name = "scraper"
 type = "javascript"
 
 account_id = ""

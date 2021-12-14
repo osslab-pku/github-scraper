@@ -1,6 +1,6 @@
-import { generateJSONResponse, generateErrorResponse } from './common/response';
-import { fieldMap, HTMLParser } from './common/htmlparser'
-import { fetchURL, getParams } from './common/request'
+import { generateJSONResponse, generateErrorResponse } from '../common/response';
+import { fieldMap, HTMLParser } from '../common/htmlparser'
+import { fetchURL, getParams } from '../common/request'
 
 /**
  * Issue Request should look like this

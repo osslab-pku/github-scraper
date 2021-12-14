@@ -1,6 +1,6 @@
-import { generateJSONResponse, generateErrorResponse } from './common/response';
-import { fieldMap, HTMLParser, zip } from './common/htmlparser'
-import { fetchURL, getParams } from './common/request'
+import { generateJSONResponse, generateErrorResponse } from '../common/response';
+import { fieldMap, HTMLParser, zip } from '../common/htmlparser'
+import { fetchURL, getParams } from '../common/request'
 
 const sampleTimelineRequest = {
   name: "caddy",
@@ -66,7 +66,14 @@ async function parseTimeline(response){
     'svg.octicon-git-commit': "commit",
     'svg.octicon-issue-closed': "close",
     'svg.octicon-pencil': "edit",
-    'svg.octicon-x': "blocked"
+    'svg.octicon-x': "blocked",
+    'svg.octicon-rocket': "deploy",
+    'svg.octicon-check': "approve",
+    'svg.octicon-person': "assign",
+    'svg.octicon-git-pull-request': "pull-request",
+    'svg.octicon-project': "project",
+    'svg.octicon-git-pull-request-draft': "draft",
+    'octicon-bookmark': "duplicate"
   })
 
   parser.addTextParser('author', '.author[data-hovercard-type="user"]')
@@ -96,7 +103,7 @@ async function parseTimeline(response){
   parser.addTextParser('reactionsCount', '.comment-reactions-options span');
 
   // events
-  parser.addTextParser('text','[class="TimelineItem-body"] div:first-of-type');
+  parser.addTextParser('text','[class="TimelineItem-body"]');
   // file diff comment (request change)
   parser.addTextParser('text','.TimelineItem-body.flex-md-row.flex-column .flex-md-self-center');
   parser.addAttributeParser('labels', '[class="TimelineItem-body"] a.IssueLabel', 'data-name');

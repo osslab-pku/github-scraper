@@ -1,38 +1,28 @@
-import { generateErrorResponse, generateJSONResponse } from './common/response'
-import { handleIssues } from './issues'
 import { checkAuth } from './auth'
-import { handleTimeline } from './timeline'
+import { generateErrorResponse, generateJSONResponse } from './common/response'
+import handleGithub from './github/route'
 import { handleIP } from './ip'
 
 const apiUsage = {
-  "/issues": "scrape and parse GitHub issues pages",
-  "/pulls": "scrape and parse GitHub pull requests pages",
   "/ip": "ip address of the scraper",
-  "/issue": "scrape and parse a GitHub issue comment page",
-  "/pull": "scrape and parse a GitHub pull request comment page",
+  "/github": "github scraper"
 }
 
 async function handleRequest(request) {
-  const {headers, method, url} = request;
+  const { headers, method, url } = request;
   const urlObj = new URL(url);
 
-  if(!checkAuth(request)){
+  if (!checkAuth(request)) {
     return generateErrorResponse("Missing `Authorization` in headers", 401);
   }
 
-  // routes
-  console.log(urlObj.pathname);
   try {
-    if (urlObj.pathname === "/issues" || urlObj.pathname === "/pulls" ) {
-      return await handleIssues(request);
-    } else if (urlObj.pathname === "/issue" || urlObj.pathname === "/pull" ) {
-      return await handleTimeline(request);
-    } else if (urlObj.pathname === "/ip"){
+    if (urlObj.pathname.startsWith("/github")){
+      return await handleGithub(request);
+    } else if (urlObj.pathname.startsWith("/ip")){
       return await handleIP(request);
     } else {
-      return generateJSONResponse({
-        ...apiUsage
-      });
+      return generateJSONResponse(apiUsage);
     }
   } catch (e) {
     // throw e;

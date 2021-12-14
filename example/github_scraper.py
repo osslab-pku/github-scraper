@@ -63,15 +63,12 @@ class GithubScraperClient:
                 self._logger.error(
                     f"{e}: retrying {self._num_retries-retries+1}/{self._num_retries}"
                 )
-                # hit rate limit, sleep and retry
-                if "too many requests" in str(e).lower():
-                    retries -= 1
-                    await asyncio.sleep(10)
                 # not found, skip this page
-                elif "not found" in str(e).lower():
-                    has_next = False
+                if "not found" in str(e).lower():
+                    retries = 0
                 else:
                     retries -= 1
+                    await asyncio.sleep(10)
                 continue
 
             if len(data) == 0 or "data" not in data.keys():
@@ -256,22 +253,13 @@ class GithubScraperClient:
 
 
 if __name__ == "__main__":
-    # an example to collect PR bodies
-    from configparser import ConfigParser
-    import pandas as pd
-
-    # parse config file
-    config = ConfigParser()
-    config.read("config.ini")
-
     # create a github scraper
     scraper = GithubScraperClient(
-        baseurl=config["Scraper"]["addr"], auth=config["Scraper"]["auth"]
+        baseurl="https://scraper.12f23eddde.workers.dev/github", auth="OSSLab@PKU"
     )
 
-    df_projects = pd.read_csv("cache/df_valid_temp.csv").sample(10)
-    name_with_owner = df_projects["name_with_owner"].tolist()
-    pr_number = df_projects["id"].tolist()
+    name_with_owner = ["focus-trap/focus-trap"]
+    pr_number = [114]
     queries = [(nam, pr) for nam, pr in zip(name_with_owner, pr_number)]
     print(queries)
 
