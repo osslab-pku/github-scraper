@@ -59,6 +59,11 @@
               "id": params["id"]
           })
   ```
+  
+### 使用有限制吗？
+
+当前爬虫使用了[Cloudflare付费计划](https://developers.cloudflare.com/workers/platform/pricing)，每月有1000万次请求额度，没有频率限制。超出限制的每百万次请求收费0.5美元。
+如果您想自己部署这个项目，可以先尝试Cloudflare免费计划，每天有10万次请求额度，频率限制为1000次每分钟。
 
 
 ### 怎么实现其他的爬虫？
