@@ -73,7 +73,7 @@ async function parseTimeline(response){
     'svg.octicon-git-pull-request': "pull-request",
     'svg.octicon-project': "project",
     'svg.octicon-git-pull-request-draft': "draft",
-    'octicon-bookmark': "duplicate"
+    'svg.octicon-bookmark': "duplicate"
   })
 
   parser.addTextParser('author', '.author[data-hovercard-type="user"]')
