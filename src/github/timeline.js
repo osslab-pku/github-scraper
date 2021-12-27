@@ -104,9 +104,18 @@ async function parseTimeline(response){
 
   // events
   parser.addTextParser('text','[class="TimelineItem-body"]');
+  parser.addAttributeParser('labels', '[class="TimelineItem-body"] a.IssueLabel', 'data-name');
+  parser.addAttributeParser('mentionedLinks', '[class="TimelineItem-body"] [href]', 'href');
+  // parser.addTextParser('title', '[class="TimelineItem-body"] .markdown-title');  // TODO why truncated
+  parser.addCaseParser('state', {
+    '[class="TimelineItem-body"] span.State[title~="Open"]': 'open',
+    '[class="TimelineItem-body"] span.State[title~="Closed"]': 'closed',
+    '[class="TimelineItem-body"] span.State[title~="Merged"]': 'merged'
+  })
+
   // file diff comment (request change)
   parser.addTextParser('text','.TimelineItem-body.flex-md-row.flex-column .flex-md-self-center');
-  parser.addAttributeParser('labels', '[class="TimelineItem-body"] a.IssueLabel', 'data-name');
+
 
   let res = await parser.parse(response)
 
@@ -123,12 +132,22 @@ async function parseTimeline(response){
 
   res = fieldMap(res, 'actedAt', v => v[0])
   res = fieldMap(res, 'text', v => v.map(t => t.trim()).join(' ').trim().replace('\n', ''))
-  res = fieldMap(res, 'title', v => v[0])
+  res = fieldMap(res, 'title', v => v[0].trim())
   res = fieldMap(res, 'state', v => v[0])
   res = fieldMap(res, 'type', v => v[0])
   res = fieldMap(res, 'isEdited', v => v[0])
 
   res = fieldMap(res, 'mentionedUsers', v => v.map(t => t.trim().substring(1)))
+
+  // links -> add https to github internals -> filter non-http -> unique
+  res = fieldMap(res, 'mentionedLinks', v => v.map(t => {
+    if (t.startsWith("/")){
+      return "https://github.com" + t;
+    } else {
+      return t;
+    }
+  }).filter(t => t.startsWith("http"))
+    .filter((item, index, array) => array.indexOf(item) === index))
 
   res = fieldMap(res, 'reactions', (v, k) => {
     return zip(v, res[k]['reactionsCount']);
