@@ -1,42 +1,78 @@
+import { Router } from 'itty-router'
+
+import { generateJSONResponse, generateErrorResponse } from './common/response'
+
 import { checkAuth } from './auth'
-import { generateErrorResponse, generateJSONResponse } from './common/response'
-import handleGithub from './github/route'
 import { handleIP } from './ip'
+import { handleTimeline } from './github/timeline'
+import { handleIssues } from './github/issues'
+import { handleScore } from './dependabot/score'
+
+const withAuth = (fn) => {
+  return async (request) => {
+    if (checkAuth(request)) {
+      try {
+        return await fn(request)
+      } catch (e) {
+        return generateErrorResponse(e)
+      }
+    } else {
+      return generateErrorResponse(
+        "Not authorized: check `Authorization` header",
+        401)
+    }
+  }
+}
+
+const router = Router()
 
 const apiUsage = {
   "/ip": "ip address of the scraper",
-  "/github": "github scraper"
+  "/github": "github scraper",
+  "/dependabot": "compatibility score"
 }
 
-async function handleRequest(request) {
-  const { headers, method, url } = request;
-  const urlObj = new URL(url);
+router.get("/", () => {
+  return generateJSONResponse(apiUsage)
+})
 
-  if (!checkAuth(request)) {
-    return generateErrorResponse("Missing `Authorization` in headers", 401);
-  }
+// ip
+router.get("/ip", handleIP)
 
-  try {
-    if (urlObj.pathname.startsWith("/github")){
-      return await handleGithub(request);
-    } else if (urlObj.pathname.startsWith("/ip")){
-      return await handleIP(request);
-    } else {
-      return generateJSONResponse(apiUsage);
-    }
-  } catch (e) {
-    // throw e;
-    console.log(e);
-    return generateErrorResponse(e);
-  }
+// github
+const githubUsage = {
+  "/issues": "scrape and parse GitHub issues pages",
+  "/pulls": "scrape and parse GitHub pull requests pages",
+  "/issue": "scrape and parse a GitHub issue comment page",
+  "/pull": "scrape and parse a GitHub pull request comment page",
 }
+
+router.get("/github", () => generateJSONResponse(githubUsage))
+router.get("/github/issues", withAuth(handleIssues))
+router.get("/github/pulls", withAuth(handleIssues))
+router.get("/github/issue", withAuth(handleTimeline))
+router.get("/github/pull", withAuth(handleTimeline))
+
+router.get("/github/:owner/:name/issues", withAuth(handleIssues))
+router.get("/github/:owner/:name/pulls", withAuth(handleIssues))
+router.get("/github/:owner/:name/issue/:id", withAuth(handleTimeline))
+router.get("/github/:owner/:name/pull/:id", withAuth(handleTimeline))
+
+router.get("/github/*", () => generateErrorResponse(githubUsage, 404))
+
+// dependabot
+const dependabotUsage = {
+  "/score": " fetch compatibility socre"
+}
+router.get("/dependabot", () => generateJSONResponse(dependabotUsage))
+router.get("/dependabot/score", withAuth(handleScore))
+router.get("/dependabot/*", () => generateErrorResponse(dependabotUsage, 404))
+
+// match unhandled requests
+router.all("*", () => generateErrorResponse(apiUsage, 404))
 
 export default {
-  // * request is the same as `event.request` from the service worker format
-  // * waitUntil() and passThroughOnException() are accessible from `ctx` instead of `event` from the service worker format
-  // * env is where bindings like KV namespaces, Durable Object namespaces, Config variables, and Secrets
-  // are exposed, instead of them being placed in global scope.
   async fetch(request, env, ctx) {
-    return handleRequest(request);
+    return router.handle(request);
   }
 }

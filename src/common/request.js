@@ -23,10 +23,11 @@ export const getParams = (request, defaultParams, sampleParams) => {
   const urlObject = new URL(url);
   const params = urlObject.searchParams;
 
-  const res = {}
+  // support path params
+  const res = Object.assign({}, request.params)
 
   for(let key in sampleParams){
-    res[key] = params.get(key);
+    (key in res) || (res[key] = params.get(key));
     if (res[key] === null){
       if (key in defaultParams){
         res[key] = defaultParams[key];

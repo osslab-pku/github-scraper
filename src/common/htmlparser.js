@@ -5,7 +5,6 @@ import { decode } from 'html-entities';
 
 export class HTMLParser {
   rewriter = new HTMLRewriter();
-  isKeyParserExists = false;
   // global states
   key = "$keyIsNull";
   res = {};
@@ -17,7 +16,6 @@ export class HTMLParser {
    * @returns {{getResult(): null, setup(*): *}|null|void|*|HTMLRewriter}
    */
   addKeyParser(selector, transform_fn){
-    this.isKeyParserExists = true;
     const parser = this;
     this.rewriter.on(selector, {
       element(element) {
@@ -100,9 +98,6 @@ export class HTMLParser {
    * @returns res
    */
   async parse(response){
-    if (!this.isKeyParserExists){
-      throw new Error("Key parser is not set");
-    }
     await this.rewriter.transform(response).arrayBuffer();
     const res = this.res;
     // reset global states

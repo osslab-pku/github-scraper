@@ -16,7 +16,8 @@ const sampleIssuesRequest = {
 
 const defaultIssuesRequest = {
   maxPages: 10,
-  fromPage: 1
+  fromPage: 1,
+  query: ""
 }
 
 /**
@@ -121,9 +122,11 @@ export async function handleIssues(request){
 
   let queryComponent = null;
   if (urlObject.pathname.includes("issues")){
-    queryComponent = "/issues?"
+    queryComponent = "/issues?";
+    (params.query) || (params.query = "is:issue");
   } else if (urlObject.pathname.includes("pulls")){
-    queryComponent = "/pulls?"
+    queryComponent = "/pulls?";
+    (params.query) || (params.query = "is:pr");
   } else {
     throw new Error("Request is not issues or pulls");
   }

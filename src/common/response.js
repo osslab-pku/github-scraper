@@ -21,7 +21,7 @@ export const generateJSONResponse = (obj, options) => {
 
 export const generateErrorResponse = (error, status) => {
   return generateJSONResponse({
-    error: typeof error === 'string' ? error : error.message,
+    error: typeof error.message !== 'undefined' ? error.message : JSON.stringify(error),
     stack: typeof error.stack !== 'undefined'? error.stack: ''
   }, { status: status || 400 });
 }
