@@ -57,7 +57,7 @@ export async function handleScore(request) {
   }
 
   const reqURL = 'https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=' +
-    params.ecosystem + '&package-manager=' + params.ecosystem + '&previous-version=' +
+    params.package + '&package-manager=' + params.ecosystem + '&previous-version=' +
     params.oldver + '&new-version=' + params.newver
 
   const response = await fetchURL(reqURL);
