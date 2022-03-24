@@ -6,7 +6,7 @@ const WHITELIST_ASNS = [4358, 23910, 24349, 59201]
  * @param request
  * @returns {boolean} res
  */
-export const checkAuth = (request) => {
+export const checkAuth = (request: Request): boolean => {
   const {headers, method, url} = request;
   const headersObj = new Headers(headers);
   const asn = request.cf.asn
