@@ -2,14 +2,19 @@ import { fetchURL, getParams } from '../common/request'
 import { HTMLParser } from '../common/htmlparser'
 import { generateJSONResponse } from '../common/response'
 
-const sampleScoreRequest = {
-  'package': 'lodash',
-  'ecosystem': 'npm',
-  'oldver': '1.14.0',
-  'newver': '1.15.0',
+type ScoreRequest = {
+  package: string,
+  ecosystem: string,
+  oldver: string,
+  newver: string,
 }
 
-const defaultScoreRequest = {}
+const sampleScoreRequest: ScoreRequest = {
+  package: 'lodash',
+  ecosystem: 'npm',
+  oldver: '1.14.0',
+  newver: '1.15.0',
+}
 
 const ecoNamesFromDependabot = {
   'bundler': 'bundler',
@@ -29,7 +34,7 @@ const ecoNamesFromDependabot = {
   'github-actions': 'github_actions',
 }
 
-async function parseSVG(response) {
+async function parseSVG(response: Response): Promise<string> {
   const parser = new HTMLParser()
   parser.addTextParser('title', 'title', 'global')
   const res = await parser.parse(response)
@@ -41,11 +46,10 @@ async function parseSVG(response) {
   }
 }
 
-export async function handleScore(request) {
-  const { headers, method, url } = request
-  const urlObject = new URL(url)
+export async function handleScore(request: Request) {
+  const { url } = request
 
-  const params = getParams(request, defaultScoreRequest, sampleScoreRequest)
+  const params = getParams<ScoreRequest>(request, sampleScoreRequest)
 
   const allowedEco = Object.values(ecoNamesFromDependabot)
   const mappedEco = Object.keys(ecoNamesFromDependabot)

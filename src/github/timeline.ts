@@ -2,15 +2,19 @@ import { generateJSONResponse, generateErrorResponse } from '../common/response'
 import { fieldMap, HTMLParser, zip } from '../common/htmlparser'
 import { fetchURL, getParams } from '../common/request'
 
-const sampleTimelineRequest = {
+type TimelineRequest = {
+  owner: string,
+  name: string,
+  id: number
+}
+
+const sampleTimelineRequest: TimelineRequest = {
   name: "caddy",
   owner: "caddyserver",
   id: 1
 };
 
-const defaultTimelineRequest = {};
-
-async function parseTimeline(response){
+async function parseTimeline(response: Response){
   const parser = new HTMLParser();
 
   // global
@@ -163,7 +167,7 @@ export async function handleTimeline(request){
   const {headers, method, url} = request;
   const urlObject = new URL(url);
 
-  const params = getParams(request, defaultTimelineRequest, sampleTimelineRequest);
+  const params = getParams(request, sampleTimelineRequest);
 
   let queryComponent = null;
   if (urlObject.pathname.includes("issue")){

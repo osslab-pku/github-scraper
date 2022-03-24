@@ -1,12 +1,22 @@
 import { generateJSONResponse, generateErrorResponse } from '../common/response';
 import { fieldMap, HTMLParser } from '../common/htmlparser'
-import { fetchURL, getParams } from '../common/request'
+import { fetchURL, getParams, Optional } from '../common/request'
+import { Request } from 'itty-router';
 
 /**
  * Issue Request should look like this
  * @type {{owner: string, query: string, maxPages: number, name: string}}
  */
-const sampleIssuesRequest = {
+
+type IssueRequest = {
+  owner: string,
+  name: string,
+  query?: string,
+  maxPages?: number,
+  fromPage?: number
+}
+
+const sampleIssuesRequest: IssueRequest = {
   name: "PyGitHub",
   owner: "PyGitHub",
   query: "is:pr author:dependabot[bot]",
@@ -14,8 +24,8 @@ const sampleIssuesRequest = {
   fromPage: 1
 }
 
-const defaultIssuesRequest = {
-  maxPages: 10,
+const defaultIssuesRequest: Optional<IssueRequest> = {
+  maxPages: 1,
   fromPage: 1,
   query: ""
 }
@@ -25,7 +35,7 @@ const defaultIssuesRequest = {
  * @param response
  * @returns {Promise<{}>} res
  */
-async function parseIssues(response) {
+async function parseIssues(response: Response): Promise<{}> {
   const parser = new HTMLParser();
 
   // set issue id
@@ -114,11 +124,10 @@ async function parseIssues(response) {
 }
 
 
-export async function handleIssues(request){
-  const {headers, method, url} = request;
+export async function handleIssues(request: Request){
+  const { url } = request;
   const urlObject = new URL(url);
-
-  const params = getParams(request, defaultIssuesRequest, sampleIssuesRequest);
+  const params = getParams<IssueRequest>(request, sampleIssuesRequest, defaultIssuesRequest);
 
   let queryComponent = null;
   if (urlObject.pathname.includes("issues")){

@@ -8,8 +8,10 @@ import { handleTimeline } from './github/timeline'
 import { handleIssues } from './github/issues'
 import { handleScore } from './dependabot/score'
 
-const withAuth = (fn) => {
-  return async (request) => {
+type RouterHandler = (request?: Request) => Promise<Response>
+
+const withAuth = (fn: RouterHandler) => {
+  return async (request: Request) => {
     if (checkAuth(request)) {
       try {
         return await fn(request)
@@ -55,10 +57,10 @@ router.get("/github/pull", withAuth(handleTimeline))
 
 router.get("/github/:owner/:name/issues", withAuth(handleIssues))
 router.get("/github/:owner/:name/pulls", withAuth(handleIssues))
-router.get("/github/:owner/:name/issue/:id", withAuth(handleTimeline))
+router.get("/github/:owner/:name/issues/:id", withAuth(handleTimeline))
 router.get("/github/:owner/:name/pull/:id", withAuth(handleTimeline))
 
-router.get("/github/*", () => generateErrorResponse(githubUsage, 404))
+router.get("/github/*", () => generateJSONResponse(githubUsage, {status: 404}))
 
 // dependabot
 const dependabotUsage = {
@@ -66,13 +68,13 @@ const dependabotUsage = {
 }
 router.get("/dependabot", () => generateJSONResponse(dependabotUsage))
 router.get("/dependabot/score", withAuth(handleScore))
-router.get("/dependabot/*", () => generateErrorResponse(dependabotUsage, 404))
+router.get("/dependabot/*", () => generateJSONResponse(dependabotUsage, {status: 404}))
 
 // match unhandled requests
-router.all("*", () => generateErrorResponse(apiUsage, 404))
+router.all("*", () => generateJSONResponse(apiUsage, {status: 404}))
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request: Request, env: any, ctx: any) {
     return router.handle(request);
   }
 }
