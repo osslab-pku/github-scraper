@@ -5,8 +5,7 @@ import { build } from "esbuild";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-try {
-  await build({
+build({
     bundle: true,
     sourcemap: true,
     format: "esm",
@@ -14,7 +13,7 @@ try {
     entryPoints: [path.join(__dirname, "src", "index.js")],
     outdir: path.join(__dirname, "dist"),
     outExtension: { ".js": ".mjs" },
-  });
-} catch {
+}).catch(e => {
+  console.error(e);
   process.exitCode = 1;
-}
+})
