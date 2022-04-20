@@ -66,8 +66,8 @@ async function parseDependents(response: Response): Promise<{}> {
   res = fieldMap(res, 'owner', v=>v.join('').replace('\n', '').trim());
   res = fieldMap(res, 'name', v=>v.join('').replace('\n', '').trim());
   res = fieldMap(res, 'package', v=>v.join('').replace('\n', '').trim());
-  res = fieldMap(res, 'stars', v=>parseInt(v.join('').replace('\n', '').trim()));
-  res = fieldMap(res, 'forks', v=>parseInt(v.join('').replace('\n', '').trim()));
+  res = fieldMap(res, 'stars', v=>parseInt(v.join('').replace('\n', '').replace(',', '').trim()));
+  res = fieldMap(res, 'forks', v=>parseInt(v.join('').replace('\n', '').replace(',', '').trim()));
 
   if ("pagination" in res) {
     res["pagination"]["next"] = res["pagination"]["next"].length > 1 ? res["pagination"]["next"][1] : res["pagination"]["next"][0];
