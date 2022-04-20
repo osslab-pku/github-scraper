@@ -7,6 +7,7 @@ import { handleIP } from './ip'
 import { handleTimeline } from './github/timeline'
 import { handleIssues } from './github/issues'
 import { handleScore } from './dependabot/score'
+import { handleDependents } from './github/dependents'
 
 type RouterHandler = (request?: Request) => Promise<Response>
 
@@ -47,6 +48,7 @@ const githubUsage = {
   "/pulls": "scrape and parse GitHub pull requests pages",
   "/issue": "scrape and parse a GitHub issue comment page",
   "/pull": "scrape and parse a GitHub pull request comment page",
+  "/dependents": "scrape and parse dependents of a GitHub repository"
 }
 
 router.get("/github", () => generateJSONResponse(githubUsage))
@@ -54,11 +56,13 @@ router.get("/github/issues", withAuth(handleIssues))
 router.get("/github/pulls", withAuth(handleIssues))
 router.get("/github/issue", withAuth(handleTimeline))
 router.get("/github/pull", withAuth(handleTimeline))
+router.get("/github/dependents", withAuth(handleDependents))
 
 router.get("/github/:owner/:name/issues", withAuth(handleIssues))
 router.get("/github/:owner/:name/pulls", withAuth(handleIssues))
 router.get("/github/:owner/:name/issues/:id", withAuth(handleTimeline))
 router.get("/github/:owner/:name/pull/:id", withAuth(handleTimeline))
+router.get("/github/:owner/:name/dependents", withAuth(handleDependents))
 
 router.get("/github/*", () => generateJSONResponse(githubUsage, {status: 404}))
 
