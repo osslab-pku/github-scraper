@@ -80,7 +80,12 @@ class GithubScraperClient:
             has_next = "next" in data.keys()
             if has_next:
                 retries = self._num_retries
-                params["fromPage"] = int(data["current"]) + 1
+                if "current" in data:
+                    params["fromPage"] = int(data["current"]) + 1
+                elif "after" in data:
+                    params["after"] = data["after"]
+                else:
+                    raise Exception(f"has no next page: {params}")
 
         # failed, return current list
         if retries == 0:
@@ -249,6 +254,31 @@ class GithubScraperClient:
             }
             for name_with_owner, number in pulls_list
         ]
+        self.get_all_with_callback(url, queries, callback)
+
+    def get_dependents_with_callback(
+        self,
+        repos_list: List[str],
+        callback: Callable[[List, Dict], Any],
+        dependent_type: str ="REPOSITORY"
+    ) -> None:
+        """
+        fetch all pages of a repo's dependents and execute a callback on each page.
+        :param repos_list: the list of repos
+        :param callback: the callback to execute on each page (result: list, params: dict) -> None
+        :param query: the query to filter dependents on GitHub dependents page (e.g. "is:dependency")
+        """
+        url = f"{self._baseurl}/dependents"
+        queries = [
+            {
+                "owner": name_with_owner.split("/")[0],
+                "name": name_with_owner.split("/")[1],
+                "type": dependent_type,
+                "maxPages": self._max_pages,
+            }
+            for name_with_owner in repos_list
+        ]
+
         self.get_all_with_callback(url, queries, callback)
 
 
