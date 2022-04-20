@@ -71,7 +71,13 @@ async function parseDependents(response: Response): Promise<{}> {
 
   if ("pagination" in res) {
     res["pagination"]["next"] = res["pagination"]["next"].length > 1 ? res["pagination"]["next"][1] : res["pagination"]["next"][0];
-    res["pagination"]["after"] = res["pagination"]["next"].match(/dependents_after=([a-zA-Z0-9]*)/)[1];
+    const matched = res["pagination"]["next"].match(/dependents_after=([a-zA-Z0-9]*)/);
+    if (!matched) { // no next page
+      res["pagination"]["after"] = "";
+      res["pagination"]["next"] = "";
+    } else {
+      res["pagination"]["after"] = matched[1];
+    }
   }
 
   return res;
