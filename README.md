@@ -22,11 +22,8 @@
       baseurl="https://scraper.12f23eddde.workers.dev/github", auth="OSSLab@PKU"
   )
   
-  # 构造请求列表 [(name_with_owner, pr_number)]
-  name_with_owner = ["focus-trap/focus-trap"]
-  pr_number = [114]
-  queries = [(nam, pr) for nam, pr in zip(name_with_owner, pr_number)]
-  print(queries)
+  # 构造请求列表 {name: str, owner: str, id: int}
+  queries = [{"name": "pygithub", "owner": "pygithub", "id": 1}]
   
   # 回调函数(python没法写多行lambda，所以这样实现)
   # results 是所有请求结果的列表，params 是请求参数
