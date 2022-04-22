@@ -1,7 +1,3 @@
-# Async client for github.com/12f23eddde/github-scraper
-# ref: https://blog.jonlu.ca/posts/async-python-http
-# 12f23eddde <12f23eddde@gmail.com> - Dec 4, 2021
-
 import os
 import asyncio
 import aiohttp
@@ -17,10 +13,18 @@ class GithubScraperClient:
         """
         Initialize a GithubScraperClient.
         :param baseurl: the base url of the scraper
-        :param auth: the authorization token
-        :param num_workers: the number of workers to fetch pages (default: 10, <=30 is recommended)
-        :param num_retries: the number of retries to fetch pages (default: 3)
-        :param max_pages: limit number of subrequests on a single fetch (default: 10, <=10 is recommended)
+        :param auth: the scraper authorization token
+        :param num_workers: max number of parallel fetching workers (default: 10, lower this when encountering '429 Too Many Requests')
+        :param num_retries: max number of retries for one fetch failure (default: 3)
+        :param max_pages: max number of subrequests on a single fetch (default: 10, lower this if the request exceeds CloudFlare Workers' runtime limit)
+
+        >>> client = GithubScraperClient(
+        ...     "https://your.scraper.url",
+        ...     "your_auth_token",
+        ...     num_workers=10,
+        ...     num_retries=3,
+        ...     max_pages=10
+        ... )
         """
         self._logger = logging.getLogger(__name__)
         self._baseurl = baseurl
@@ -72,7 +76,7 @@ class GithubScraperClient:
                 continue
 
             if len(data) == 0 or "data" not in data.keys():
-                raise Exception(f"{params} has no body")
+                raise Exception(f"has no body: {params} {data}")
 
             all_res.extend(data["data"])
 
@@ -85,7 +89,7 @@ class GithubScraperClient:
                 elif "after" in data:
                     params["after"] = data["after"]
                 else:
-                    raise Exception(f"has no next page: {params}")
+                    raise Exception(f"has no next page: {params} {data}")
 
         # failed, return current list
         if retries == 0:
@@ -113,7 +117,8 @@ class GithubScraperClient:
         :param queries: the list of params
         :return: a list of all responses
         """
-        conn = aiohttp.TCPConnector(limit_per_host=100, limit=0, ttl_dns_cache=300)
+        conn = aiohttp.TCPConnector(
+            limit_per_host=100, limit=0, ttl_dns_cache=300)
         loop = asyncio.get_event_loop()
 
         async def async_worker():
@@ -143,7 +148,8 @@ class GithubScraperClient:
         :param callback: the callback to execute on each page (result: list, params: dict) -> None
         """
         # Initialize connection pool
-        conn = aiohttp.TCPConnector(limit_per_host=100, limit=0, ttl_dns_cache=300)
+        conn = aiohttp.TCPConnector(
+            limit_per_host=100, limit=0, ttl_dns_cache=300)
         loop = asyncio.get_event_loop()
 
         async def async_worker():
@@ -165,141 +171,171 @@ class GithubScraperClient:
 
     def get_issue_lists_with_callback(
         self,
-        repos_list: List[str],
+        queries_list: List[Dict[str, str]],
         callback: Callable[[List, Dict], Any],
-        query="is:issue",
     ) -> None:
         """
         fetch all pages of a repo's issues and execute a callback on each page.
-        :param repos_list: the list of repos
+        :param queries_list: the list of params ({owner: str, name: str, query?: str})
         :param callback: the callback to execute on each page (result: list, params: dict) -> None
-        :param query: the query to filter issues on GitHub issues page (e.g. "is:issue")
+
+        >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
+        >>> queries_list = [
+        ...     {"owner": "octocat", "name": "Hello-World"},
+        ...     {"owner": "octocat", "name": "Hello-World", "query": "is:closed is:issue"},
+        ... ]
+        >>> client.get_issue_lists_with_callback(queries_list, callback=lambda x, y: print(x, y))
         """
         url = f"{self._baseurl}/issues"
         queries = [
             {
-                "owner": name_with_owner.split("/")[0],
-                "name": name_with_owner.split("/")[1],
-                "query": query,
+                "owner": q["owner"],
+                "name": q["name"],
+                "query": q["query"] if "query" in q else "is:issue",
                 "fromPage": 1,
                 "maxPages": self._max_pages,
             }
-            for name_with_owner in repos_list
+            for q in queries_list
         ]
 
         self.get_all_with_callback(url, queries, callback)
 
     def get_pull_lists_with_callback(
         self,
-        repos_list: List[str],
+        queries_list: List[Dict[str, str]],
         callback: Callable[[List, Dict], Any],
-        query="is:pr",
     ) -> None:
         """
         fetch all pages of a repo's pull requests and execute a callback on each page.
-        :param repos_list: the list of repos
+        :param queries_list: the list of params ({owner: str, name: str, query?: str})
         :param callback: the callback to execute on each page (result: list, params: dict) -> None
-        :param query: the query to filter pulls on GitHub pulls page (e.g. "is:pr")
+
+        >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
+        >>> queries_list = [
+        ...     {"owner": "octocat", "name": "Hello-World"},
+        ...     {"owner": "octocat", "name": "Hello-World", "query": "is:closed is:pr"},
+        ... ]
+        >>> client.get_issue_lists_with_callback(queries_list, callback=lambda x, y: print(x, y))
         """
+
         url = f"{self._baseurl}/pulls"
         queries = [
             {
-                "owner": name_with_owner.split("/")[0],
-                "name": name_with_owner.split("/")[1],
-                "query": query,
+                "owner": q["owner"],
+                "name": q["name"],
+                "query": q["query"] if "query" in q else "is:pr",
                 "fromPage": 1,
                 "maxPages": self._max_pages,
             }
-            for name_with_owner in repos_list
+            for q in queries_list
         ]
 
         self.get_all_with_callback(url, queries, callback)
 
     def get_issues_with_callback(
-        self, issues_list: List[Tuple[str, int]], callback: Callable[[List, Dict], Any]
+        self, queries_list: List[Dict[str, str or int]], callback: Callable[[List, Dict], Any]
     ) -> None:
         """
         fetch a repo's issue and execute a callback on it.
-        :param issues_list: the list of issues [(repo, number)]
-        :param number: the issue number to fetch
+        :param queries: the list of issues {owner: str, name: str, id: int}
         :param callback: the callback to execute on the issue (results: list, params: dict) -> None
+
+        >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
+        >>> queries_list = [
+        ...     {"owner": "octocat", "name": "Hello-World", "id": 1},
+        ... ]
+        >>> client.get_issues_with_callback(queries_list, callback=lambda x, y: print(x, y))
         """
         url = f"{self._baseurl}/issue"
-        queries = [
-            {
-                "owner": name_with_owner.split("/")[0],
-                "name": name_with_owner.split("/")[1],
-                "id": number,
-            }
-            for name_with_owner, number in issues_list
-        ]
 
-        self.get_all_with_callback(url, queries, callback)
+        self.get_all_with_callback(url, queries_list, callback)
 
     def get_pulls_with_callback(
-        self, pulls_list: List[Tuple[str, int]], callback: Callable[[List, Dict], Any]
+        self, queries_list: List[Dict[str, str or int]], callback: Callable[[List, Dict], Any]
     ) -> None:
         """
-        fetch a repo's pull request and execute a callback on it.
-        :param pulls_list: the list of pulls [(repo, number)]
-        :param number: the pull request number to fetch
-        :param callback: the callback to execute on the issue (results: list, params: dict) -> None
+        fetch a repo's PR and execute a callback on it.
+        :param queries: the list of issues {owner: str, name: str, id: int}
+        :param callback: the callback to execute on the PR (results: list, params: dict) -> None
+
+        >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
+        >>> queries_list = [
+        ...     {"owner": "octocat", "name": "Hello-World", "id": 2},
+        ... ]
+        >>> client.get_issue_lists_with_callback(queries_list, callback=lambda x, y: print(x, y))
         """
         url = f"{self._baseurl}/pull"
-        queries = [
-            {
-                "owner": name_with_owner.split("/")[0],
-                "name": name_with_owner.split("/")[1],
-                "id": number,
-            }
-            for name_with_owner, number in pulls_list
-        ]
-        self.get_all_with_callback(url, queries, callback)
+
+        self.get_all_with_callback(url, queries_list, callback)
 
     def get_dependents_with_callback(
         self,
-        repos_list: List[str],
+        queries_list: List[Dict[str, str]],
         callback: Callable[[List, Dict], Any],
-        dependent_type: str ="REPOSITORY"
     ) -> None:
         """
         fetch all pages of a repo's dependents and execute a callback on each page.
-        :param repos_list: the list of repos
+        :param queries_list: the list of queries {owner: str, name: str, type?: str, pa
         :param callback: the callback to execute on each page (result: list, params: dict) -> None
-        :param query: the query to filter dependents on GitHub dependents page (e.g. "is:dependency")
+
+        >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
+        >>> queries_list = [
+        ...     {"owner": "octocat", "name": "Hello-World"},
+        ...     {"owner": "octocat", "name": "Hello-World", "type": "REPOSITORY"},
+        ...     {"owner": "octocat", "name": "Hello-World", "type": "PACKAGE", "package_id": "UGFja2FnZS0yOTQyNTU2OTcx"},
+        ... ]
+        >>> client.get_dependents_with_callback(queries_list, callback=lambda x, y: print(x, y))
         """
         url = f"{self._baseurl}/dependents"
         queries = [
             {
-                "owner": name_with_owner.split("/")[0],
-                "name": name_with_owner.split("/")[1],
-                "type": dependent_type,
+                "owner": q["owner"],
+                "name": q["name"],
+                "type": q["type"] if "type" in q else "",
+                "packageId": q["package_id"] if "package_id" in q else "",
+                "after": q["after"] if "after" in q else "",
                 "maxPages": self._max_pages,
             }
-            for name_with_owner in repos_list
+            for q in queries_list
         ]
 
         self.get_all_with_callback(url, queries, callback)
 
 
 if __name__ == "__main__":
-    # create a github scraper
+    # # Uncomment the following lines to run in jupyter notebook
+    # %pip install nest_asyncio
+    # import nest_asyncio
+    # nest_asyncio.apply()
+
+    import pandas as pd
+
+    def callback(results: list, params: dict) -> None:
+        if not results:
+            return
+
+        df = pd.DataFrame(results)
+
+        filename = f"{params['owner']}_{params['name']}"
+        filename += f"{'_' + params['type'] if 'type' in params and params['type'] else ''}"
+        filename += f"{'_' + params['package_id'] if 'packageId' in params and params['packageId'] else ''}"
+        filename += ".csv"
+        print(f"{params}: {len(df)} entries > {filename}")
+
+        df.drop(columns=['id'], inplace=True)
+        df.to_csv(filename, index=False)
+
     scraper = GithubScraperClient(
         baseurl="https://scraper.12f23eddde.workers.dev/github", auth="OSSLab@PKU"
     )
 
-    name_with_owner = ["focus-trap/focus-trap"]
-    pr_number = [114]
-    queries = [(nam, pr) for nam, pr in zip(name_with_owner, pr_number)]
-    print(queries)
-
-    # callback save the results (in this case, the body of the PR)
-    def callback(results: list, params: dict) -> None:
-        if len(results) == 0:
-            return
-        print(params["name"], results[-1])
-
-    # fetch the PR bodies
-    scraper.get_pulls_with_callback(queries, callback)
-    # fetch issues
-    scraper.get_issue_lists_with_callback(name_with_owner, callback)
+    scraper.get_dependents_with_callback(
+        [
+            {
+                "name": "focus-trap",
+                "owner": "focus-trap",
+                "type": "PACKAGE",
+            }
+        ],
+        callback,
+    )
