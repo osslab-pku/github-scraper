@@ -1,9 +1,8 @@
-import os
 import asyncio
 import aiohttp
 import logging
 from tqdm.asyncio import tqdm
-from typing import Callable, Any, Dict, List, Tuple
+from typing import Callable, Any, Dict, List
 
 
 class GithubScraperClient:
@@ -17,7 +16,6 @@ class GithubScraperClient:
         :param num_workers: max number of parallel fetching workers (default: 10, lower this when encountering '429 Too Many Requests')
         :param num_retries: max number of retries for one fetch failure (default: 3)
         :param max_pages: max number of subrequests on a single fetch (default: 10, lower this if the request exceeds CloudFlare Workers' runtime limit)
-
         >>> client = GithubScraperClient(
         ...     "https://your.scraper.url",
         ...     "your_auth_token",
@@ -122,7 +120,7 @@ class GithubScraperClient:
         loop = asyncio.get_event_loop()
 
         async def async_worker():
-            self._session = aiohttp.ClientSession(connector=conn)
+            self._session = aiohttp.ClientSession(connector=conn, trust_env=True)
             try:
                 res = await tqdm.gather(*(self._get(url, params) for params in queries))
                 return res
@@ -153,7 +151,7 @@ class GithubScraperClient:
         loop = asyncio.get_event_loop()
 
         async def async_worker():
-            self._session = aiohttp.ClientSession(connector=conn)
+            self._session = aiohttp.ClientSession(connector=conn, trust_env=True)
             try:
                 await tqdm.gather(
                     *(
@@ -178,7 +176,6 @@ class GithubScraperClient:
         fetch all pages of a repo's issues and execute a callback on each page.
         :param queries_list: the list of params ({owner: str, name: str, query?: str})
         :param callback: the callback to execute on each page (result: list, params: dict) -> None
-
         >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
         >>> queries_list = [
         ...     {"owner": "octocat", "name": "Hello-World"},
@@ -209,7 +206,6 @@ class GithubScraperClient:
         fetch all pages of a repo's pull requests and execute a callback on each page.
         :param queries_list: the list of params ({owner: str, name: str, query?: str})
         :param callback: the callback to execute on each page (result: list, params: dict) -> None
-
         >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
         >>> queries_list = [
         ...     {"owner": "octocat", "name": "Hello-World"},
@@ -239,7 +235,6 @@ class GithubScraperClient:
         fetch a repo's issue and execute a callback on it.
         :param queries: the list of issues {owner: str, name: str, id: int}
         :param callback: the callback to execute on the issue (results: list, params: dict) -> None
-
         >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
         >>> queries_list = [
         ...     {"owner": "octocat", "name": "Hello-World", "id": 1},
@@ -257,7 +252,6 @@ class GithubScraperClient:
         fetch a repo's PR and execute a callback on it.
         :param queries: the list of issues {owner: str, name: str, id: int}
         :param callback: the callback to execute on the PR (results: list, params: dict) -> None
-
         >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
         >>> queries_list = [
         ...     {"owner": "octocat", "name": "Hello-World", "id": 2},
@@ -277,7 +271,6 @@ class GithubScraperClient:
         fetch all pages of a repo's dependents and execute a callback on each page.
         :param queries_list: the list of queries {owner: str, name: str, type?: str, pa
         :param callback: the callback to execute on each page (result: list, params: dict) -> None
-
         >>> client = GithubScraperClient(baseurl="https://your.scraper.url", auth="token")
         >>> queries_list = [
         ...     {"owner": "octocat", "name": "Hello-World"},
@@ -303,39 +296,176 @@ class GithubScraperClient:
 
 
 if __name__ == "__main__":
-    # # Uncomment the following lines to run in jupyter notebook
-    # %pip install nest_asyncio
-    # import nest_asyncio
-    # nest_asyncio.apply()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mongo-url", default="mongodb://localhost:27017", help="MongoDB URL")
+    parser.add_argument("--mongo-db", default="github", help="MongoDB database name")
+    parser.add_argument("--scraper-url", default="https://scraper.12f23eddde.workers.dev/github", help="Scraper URL")
+    parser.add_argument("--scraper-auth", default="OSSLab@PKU", help="Scraper auth token")
+    parser.add_argument("--issue-list", nargs="+", help="collection, # of workers for issue list (e.g. --issue-list issues 5) ")
+    parser.add_argument("--pull-list", nargs="+", help="(collection, # of workers) for pull list (e.g. --pull-list pulls 5)")
+    parser.add_argument("--issue-body", nargs="+", help="(collection, # of workers) for issue body (e.g. --issue-body issues 25)")
+    parser.add_argument("--pull-body", nargs="+", help="(collection, # of workers) for pull body (e.g. --pull-body pulls 25)")
+    args = parser.parse_args()
 
-    import pandas as pd
+    import pymongo
+    client = pymongo.MongoClient(args.mongo_url)
+    db = getattr(client, args.mongo_db)
 
-    def callback(results: list, params: dict) -> None:
-        if not results:
-            return
+    def get_project_list() -> list:
+        """get the list of projects to scrape ([{name: xx, owner: xx}, ...])"""
+        import pandas as pd
+        df_raw = pd.read_excel("rn-projects.xlsx")
+        s_projects = df_raw[df_raw["FLAG"] == 1]["Name"].unique()
+        return [{"owner": p.split("/")[0], "name": p.split("/")[1]} for p in s_projects]
 
-        df = pd.DataFrame(results)
+    def get_issue_list() -> list:
+        """get the list of issues to scrape ([{name: xx, owner: xx, id: xx}, ...])"""
+        # _issue_col, _ = get_args(getattr(args, "issue_list"), "issue_list")
+        # return list(getattr(db, _issue_col).find({}, {"owner": 1, "name": 1, "id": 1, "_id": 0}))
+        return list(db.issues.find(projection={"owner": 1, "name": 1, "id": 1, "_id": 0}))
 
-        filename = f"{params['owner']}_{params['name']}"
-        filename += f"{'_' + params['type'] if 'type' in params and params['type'] else ''}"
-        filename += f"{'_' + params['package_id'] if 'packageId' in params and params['packageId'] else ''}"
-        filename += ".csv"
-        print(f"{params}: {len(df)} entries > {filename}")
+    def get_pull_list() -> list:
+        """get the list of PRs to scrape ([{name: xx, owner: xx, id: xx}, ...])"""
+        # _pull_col, _ = get_args(getattr(args, "pull_list"), "pull_list")
+        # return list(getattr(db, _pull_col).find({}, {"owner": 1, "name": 1, "id": 1, "_id": 0}))
+        return list(db.pull_requests.find(projection={"owner": 1, "name": 1, "id": 1, "_id": 0}))
 
-        df.drop(columns=['id'], inplace=True)
-        df.to_csv(filename, index=False)
+    def get_args(_l: list, _to_scrape: str):
+        _l = getattr(args, _to_scrape)
+        if _l is None:
+            return None, None
+        if len(_l) > 0:
+            _collection = _l[0]
+        else:
+            _collection = _to_scrape
+        if len(_l) > 1:
+            _workers = int(_l[1])
+        elif "list" in _to_scrape:
+            _workers = 5
+        else:
+            _workers = 25
+        return _collection, _workers
 
-    scraper = GithubScraperClient(
-        baseurl="https://scraper.12f23eddde.workers.dev/github", auth="OSSLab@PKU"
-    )
+    for _to_scrape in ["issue_list", "pull_list", "issue_body", "pull_body"]:
+        _collection, _workers = get_args(getattr(args, _to_scrape), _to_scrape)
+        if not _collection:
+            continue
+        print("Scraping %s with %d workers > %s.%s" % (_to_scrape, _workers, args.mongo_db, _collection))
+        
+        scraper = GithubScraperClient(
+            baseurl=args.scraper_url, auth=args.scraper_auth, num_workers=_workers
+        )
 
-    scraper.get_dependents_with_callback(
-        [
-            {
-                "name": "focus-trap",
-                "owner": "focus-trap",
-                "type": "PACKAGE",
-            }
-        ],
-        callback,
-    )
+        if _to_scrape == "issue_list":
+            # scrape brief issue info (id, title, actedAt, state, checks) and save to mongodb
+            def _callback(results: list, params: dict) -> None:
+                if not results:
+                    return
+                for result in results:
+                    getattr(db, _collection).replace_one(
+                        {
+                            "owner": params["owner"],
+                            "name": params["name"],
+                            "id": result["id"],
+                        },
+                        {
+                            **result,
+                            "owner": params["owner"],
+                            "name": params["name"],
+                        },
+                        upsert=True,
+                        )
+                print(f"project: {params['owner']}/{params['name']}, results: {len(results)}, head: {results[:1]}")
+            project_list = get_project_list()
+            print(f"Total projects: {len(project_list)}, first 5: {project_list[:5]}")
+            # create index
+            getattr(db, _collection).create_index([("owner", pymongo.ASCENDING), ("name", pymongo.ASCENDING), ("id", pymongo.ASCENDING)], unique=True)
+            # run query
+            scraper.get_issue_lists_with_callback(project_list, _callback)
+
+        elif _to_scrape == "pull_list":
+            # scrape brief pull info (id, title, actedAt, state, checks) and save to mongodb
+            def _callback(results: list, params: dict) -> None:
+                if not results:
+                    return
+                for result in results:
+                    getattr(db, _collection).replace_one(
+                        {
+                            "owner": params["owner"],
+                            "name": params["name"],
+                            "id": result["id"],
+                        },
+                        {
+                            **result,
+                            "owner": params["owner"],
+                            "name": params["name"],
+                        },
+                        upsert=True,
+                        )
+                print(f"project: {params['owner']}/{params['name']}, results: {len(results)}, head: {results[:1]}")
+            project_list = get_project_list()
+            print(f"Total projects: {len(project_list)}, first 5: {project_list[:5]}")
+            # create index
+            getattr(db, _collection).create_index([("owner", pymongo.ASCENDING), ("name", pymongo.ASCENDING), ("id", pymongo.ASCENDING)], unique=True)
+            # run query
+            scraper.get_pull_lists_with_callback(project_list, _callback)
+        
+        elif _to_scrape == "issue_body":
+            # scrape issue body and save to mongodb
+            def _callback(results: list, params: dict) -> None:
+                if not results:
+                    return
+                for result in results:
+                    getattr(db, _collection).replace_one(
+                        {
+                            "owner": params["owner"],
+                            "name": params["name"],
+                            "id": params["id"],
+                            "itemId": result["itemId"],
+                        },
+                        {
+                            **result,
+                            "owner": params["owner"],
+                            "name": params["name"],
+                            "id": params["id"],
+                        },
+                        upsert=True,
+                    )
+
+            list_issues = get_issue_list()
+            print(f"Total issues: {len(list_issues)}, first 5: {list_issues[:5]}")
+            # create index
+            getattr(db, _collection).create_index([("owner", pymongo.ASCENDING), ("name", pymongo.ASCENDING), ("id", pymongo.ASCENDING), ("itemId", pymongo.ASCENDING)], unique=True)
+            # run query
+            scraper.get_issues_with_callback(list_issues, _callback)
+
+        elif _to_scrape == "pull_body":
+            # scrape pull body and save to mongodb
+            def _callback(results: list, params: dict) -> None:
+                if not results:
+                    return
+                for result in results:
+                    getattr(db, _collection).replace_one(
+                        {
+                            "owner": params["owner"],
+                            "name": params["name"],
+                            "id": params["id"],
+                            "itemId": result["itemId"],
+                        },
+                        {
+                            **result,
+                            "owner": params["owner"],
+                            "name": params["name"],
+                            "id": params["id"],
+                        },
+                        upsert=True,
+                    )
+
+            list_pulls = get_pull_list()
+            print(f"Total pulls: {len(list_pulls)}, first 5: {list_pulls[:5]}")
+            # create index
+            getattr(db, _collection).create_index([("owner", pymongo.ASCENDING), ("name", pymongo.ASCENDING), ("id", pymongo.ASCENDING), ("itemId", pymongo.ASCENDING)], unique=True)
+            # run query
+            scraper.get_pulls_with_callback(list_pulls, _callback)
+
