@@ -15,7 +15,10 @@
 #### Python
 
 1. 安装两个依赖：`aiohttp`和`tqdm` （您可能需要python>=3.7 以及 tqdm >= 4.62.0）
-2. 在`example/github_client.py`中有一个简单的python异步客户端实现，您可以把`github_client.py`复制到自己的项目中。示例用法如下：
+2. 在`example/github_client.py`中有一个简单的python异步客户端实现，您可以把`github_client.py`复制到自己的项目中。
+
+example文件夹中有两个示例: `example/dependents_csv.py`（将项目依赖导出为csv) 和 `example/issues_mongo`（将项目issue保存到mongodb)。
+示例用法如下：
   ```python
   # 创建一个客户端
   scraper = GithubScraperClient(

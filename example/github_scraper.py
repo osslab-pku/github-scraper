@@ -2,12 +2,12 @@ import asyncio
 import aiohttp
 import logging
 from tqdm.asyncio import tqdm
-from typing import Callable, Any, Dict, List
+from typing import Callable, Any, Dict, List, Optional
 
 
 class GithubScraperClient:
     def __init__(
-        self, baseurl: str, auth: str, num_workers=10, num_retries=3, max_pages=10
+        self, baseurl: str, auth: str, num_workers=10, num_retries=3, max_pages=10, proxy:Optional[str]=None
     ) -> None:
         """
         Initialize a GithubScraperClient.
@@ -16,12 +16,14 @@ class GithubScraperClient:
         :param num_workers: max number of parallel fetching workers (default: 10, lower this when encountering '429 Too Many Requests')
         :param num_retries: max number of retries for one fetch failure (default: 3)
         :param max_pages: max number of subrequests on a single fetch (default: 10, lower this if the request exceeds CloudFlare Workers' runtime limit)
+        :param proxy: the http proxy to use, e.g. http://localhost:1080 (default: None)
         >>> client = GithubScraperClient(
         ...     "https://your.scraper.url",
         ...     "your_auth_token",
         ...     num_workers=10,
         ...     num_retries=3,
-        ...     max_pages=10
+        ...     max_pages=10,
+        ...     proxy="http://user:pass@some.proxy.com"
         ... )
         """
         self._logger = logging.getLogger(__name__)
@@ -30,6 +32,7 @@ class GithubScraperClient:
         self._num_retries = num_retries
         self._max_pages = max_pages
         self._semaphore = asyncio.Semaphore(num_workers)
+        self._proxy = proxy
 
     async def _fetch(self, url: str, params: Dict[str, str]) -> Dict[str, Any]:
         """
@@ -40,7 +43,7 @@ class GithubScraperClient:
         }
         async with self._semaphore:
             async with self._session.get(
-                url, params=params, headers=headers
+                url, params=params, headers=headers, proxy=self._proxy
             ) as response:
                 data = await response.json()
                 if response.status != 200:
@@ -181,7 +184,9 @@ class GithubScraperClient:
         ...     {"owner": "octocat", "name": "Hello-World"},
         ...     {"owner": "octocat", "name": "Hello-World", "query": "is:closed is:issue"},
         ... ]
-        >>> client.get_issue_lists_with_callback(queries_list, callback=lambda x, y: print(x, y))
+        >>> client.get_issue_lists_with_callback(queries_list, callback=lambda x, y: print(x, y, sep="\\n"))
+        [{'id': 1719, 'state': 'closed', 'title': 'Yellow !', 'author': 'leonnelkakpo', 'actedAt': '2022-01-14T00:46:41Z'}]
+        {'owner': 'octocat', 'name': 'Hello-World', 'query': 'is:issue'}
         """
         url = f"{self._baseurl}/issues"
         queries = [
@@ -211,9 +216,10 @@ class GithubScraperClient:
         ...     {"owner": "octocat", "name": "Hello-World"},
         ...     {"owner": "octocat", "name": "Hello-World", "query": "is:closed is:pr"},
         ... ]
-        >>> client.get_issue_lists_with_callback(queries_list, callback=lambda x, y: print(x, y))
+        >>> client.get_issue_lists_with_callback(queries_list, callback=lambda x, y: print(x, y, sep="\\n"))
+        [{'id': 1719, 'state': 'merged', 'title': 'Yellow !', 'author': 'leonnelkakpo', 'actedAt': '2022-01-14T00:46:41Z'}]
+        {'owner': 'octocat', 'name': 'Hello-World', 'query': 'is:pr'}
         """
-
         url = f"{self._baseurl}/pulls"
         queries = [
             {
@@ -239,7 +245,11 @@ class GithubScraperClient:
         >>> queries_list = [
         ...     {"owner": "octocat", "name": "Hello-World", "id": 1},
         ... ]
-        >>> client.get_issues_with_callback(queries_list, callback=lambda x, y: print(x, y))
+        >>> client.get_issues_with_callback(queries_list, callback=lambda x, y: print(x, y, sep="\\n"))
+        [{'itemId': '1', 'type': 'close', 'text': 'leonnelkakpo closed this as completed  Jan 14, 2022', 
+        'mentionedLinks': ['https://github.com/leonnelkakpo', 'https://github.com/octocat/Hello-World/issues?q=is%3Aissue+is%3Aclosed+archived%3Afalse+reason%3Acompleted'], 
+        'author': 'leonnelkakpo', 'actedAt': '2022-01-14T00:46:41Z'}]
+        {'owner': 'octocat', 'name': 'Hello-World', 'id': 1}
         """
         url = f"{self._baseurl}/issue"
 
@@ -256,7 +266,11 @@ class GithubScraperClient:
         >>> queries_list = [
         ...     {"owner": "octocat", "name": "Hello-World", "id": 2},
         ... ]
-        >>> client.get_issue_lists_with_callback(queries_list, callback=lambda x, y: print(x, y))
+        >>> client.get_pulls_lists_with_callback(queries_list, callback=lambda x, y: print(x, y, sep="\\n"))
+        [{'itemId': '1', 'type': 'close', 'text': 'leonnelkakpo closed this as completed  Jan 14, 2022', 
+        'mentionedLinks': ['https://github.com/leonnelkakpo', 'https://github.com/octocat/Hello-World/issues?q=is%3Aissue+is%3Aclosed+archived%3Afalse+reason%3Acompleted'], 
+        'author': 'leonnelkakpo', 'actedAt': '2022-01-14T00:46:41Z'}]
+        {'owner': 'octocat', 'name': 'Hello-World', 'id': 2}
         """
         url = f"{self._baseurl}/pull"
 
@@ -277,14 +291,16 @@ class GithubScraperClient:
         ...     {"owner": "octocat", "name": "Hello-World", "type": "REPOSITORY"},
         ...     {"owner": "octocat", "name": "Hello-World", "type": "PACKAGE", "package_id": "UGFja2FnZS0yOTQyNTU2OTcx"},
         ... ]
-        >>> client.get_dependents_with_callback(queries_list, callback=lambda x, y: print(x, y))
+        >>> client.get_dependents_with_callback(queries_list, callback=lambda x, y: print(x, y, sep="\\n"))
+        [{'id': 1, 'owner': 'martin-mcinerney', 'name': 'django-lets-go', 'stars': 0, 'forks': 0}]
+        {"owner": "octocat", "name": "Hello-World", "type": "REPOSITORY"}
         """
         url = f"{self._baseurl}/dependents"
         queries = [
             {
                 "owner": q["owner"],
                 "name": q["name"],
-                "type": q["type"] if "type" in q else "",
+                "type": q["type"] if "type" in q else "REPOSITORY",
                 "packageId": q["package_id"] if "package_id" in q else "",
                 "after": q["after"] if "after" in q else "",
                 "maxPages": self._max_pages,
