@@ -2,12 +2,18 @@ import asyncio
 import aiohttp
 import logging
 from tqdm.asyncio import tqdm
-from typing import Callable, Any, Dict, List, Optional
+from typing import Callable, Any, Dict, List, Literal, Optional
 
 
 class GithubScraperClient:
     def __init__(
-        self, baseurl: str, auth: str, num_workers=10, num_retries=3, max_pages=10, proxy:Optional[str]=None
+        self, baseurl: str, 
+        auth: str, 
+        num_workers=10, 
+        num_retries=3, 
+        max_pages=10, 
+        proxy: Optional[str] = None, 
+        log_level: Literal["INFO", "WARNING", "ERROR", "DEBUG"] = "DEBUG"
     ) -> None:
         """
         Initialize a GithubScraperClient.
@@ -17,6 +23,7 @@ class GithubScraperClient:
         :param num_retries: max number of retries for one fetch failure (default: 3)
         :param max_pages: max number of subrequests on a single fetch (default: 10, lower this if the request exceeds CloudFlare Workers' runtime limit)
         :param proxy: the http proxy to use, e.g. http://localhost:1080 (default: None)
+        :param log_level: logging level (DEBUG, INFO, WARNING, ERROR)
         >>> client = GithubScraperClient(
         ...     "https://your.scraper.url",
         ...     "your_auth_token",
@@ -27,6 +34,7 @@ class GithubScraperClient:
         ... )
         """
         self._logger = logging.getLogger(__name__)
+        self._logger.setLevel(log_level)
         self._baseurl = baseurl
         self._auth = auth
         self._num_retries = num_retries
@@ -45,12 +53,11 @@ class GithubScraperClient:
             async with self._session.get(
                 url, params=params, headers=headers, proxy=self._proxy
             ) as response:
-                data = await response.json()
                 if response.status != 200:
                     raise Exception(
-                        f"{response.status} {response.reason} {data['error']}"
+                        f"{response.url} {response.status} {response.reason}: {await response.text()}"
                     )
-                return data
+                return await response.json()
 
     async def _get(self, url: str, params: Dict[str, str]) -> List[Dict[str, Any]]:
         """
@@ -63,6 +70,7 @@ class GithubScraperClient:
         while has_next and retries > 0:
             data = None
             try:
+                self._logger.debug("collected=%d, url=%s, params=%s", len(all_res), url, params)
                 data = await self._fetch(url, params)
             except Exception as e:
                 self._logger.error(
@@ -484,4 +492,3 @@ if __name__ == "__main__":
             getattr(db, _collection).create_index([("owner", pymongo.ASCENDING), ("name", pymongo.ASCENDING), ("id", pymongo.ASCENDING), ("itemId", pymongo.ASCENDING)], unique=True)
             # run query
             scraper.get_pulls_with_callback(list_pulls, _callback)
-
