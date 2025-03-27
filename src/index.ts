@@ -77,8 +77,4 @@ router.get("/dependabot/*", () => generateJSONResponse(dependabotUsage, {status:
 // match unhandled requests
 router.all("*", () => generateJSONResponse(apiUsage, {status: 404}))
 
-export default {
-  async fetch(request: Request, env: any, ctx: any) {
-    return router.handle(request);
-  }
-}
+export default router

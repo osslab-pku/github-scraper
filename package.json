@@ -9,21 +9,22 @@
     "build": "node build.js",
     "dev": "miniflare --live-reload --debug",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "format": "prettier --write '**/*.{js,css,json,md}'"
+    "format": "prettier --write '**/*.{js,css,json,md}'",
+    "deploy": "wrangler publish"
   },
   "author": "12f23eddde <12f23eddde@gmail.com>",
   "license": "Apache",
   "devDependencies": {
-    "@cloudflare/workers-types": "^3.2.0",
-    "esbuild": "^0.13.13",
-    "eslint": "^7.21.0",
-    "eslint-config-prettier": "^8.1.0",
-    "miniflare": "^2.0.0-rc.1",
-    "prettier": "^1.18.2",
-    "typescript": "^4.6.2"
+    "@cloudflare/workers-types": "^4.20250321.0",
+    "esbuild": "^0.25.1",
+    "eslint": "^9.23.0",
+    "eslint-config-prettier": "^10.1.1",
+    "miniflare": "^4.20250320.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2"
   },
   "dependencies": {
-    "html-entities": "^2.3.2",
-    "itty-router": "^2.4.8"
+    "html-entities": "^2.5.3",
+    "itty-router": "^5.0.18"
   }
 }
