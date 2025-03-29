@@ -1,6 +1,9 @@
 name = "scraper"
-main = "dist/index.mjs"
-compatibility_date = "2021-12-10"
+compatibility_date = "2025-03-21"
+main = "src/index.ts"
 
-[build]
-command = "npm run build"
+[observability]
+enabled = true
+
+[browser] 
+binding = "BROWSER"

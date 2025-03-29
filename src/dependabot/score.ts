@@ -3,10 +3,10 @@ import { HTMLParser } from '../common/htmlparser'
 import { generateJSONResponse } from '../common/response'
 
 type ScoreRequest = {
-  package: string,
-  ecosystem: string,
-  oldver: string,
-  newver: string,
+  package: string
+  ecosystem: string
+  oldver: string
+  newver: string
 }
 
 const sampleScoreRequest: ScoreRequest = {
@@ -17,20 +17,20 @@ const sampleScoreRequest: ScoreRequest = {
 }
 
 const ecoNamesFromDependabot = {
-  'bundler': 'bundler',
-  'composer': 'composer',
-  'docker': 'docker',
-  'maven': 'maven',
-  'npm': 'npm_and_yarn',
-  'elm': 'elm',
-  'gitsubmodule': 'submodules',
-  'mix': 'hex',
-  'cargo': 'cargo',
-  'gradle': 'gradle',
-  'nuget': 'nuget',
-  'gomod': 'go_modules',
-  'pip': 'pip',
-  'terraform': 'terraform',
+  bundler: 'bundler',
+  composer: 'composer',
+  docker: 'docker',
+  maven: 'maven',
+  npm: 'npm_and_yarn',
+  elm: 'elm',
+  gitsubmodule: 'submodules',
+  mix: 'hex',
+  cargo: 'cargo',
+  gradle: 'gradle',
+  nuget: 'nuget',
+  gomod: 'go_modules',
+  pip: 'pip',
+  terraform: 'terraform',
   'github-actions': 'github_actions',
 }
 
@@ -40,7 +40,7 @@ async function parseSVG(response: Response): Promise<string> {
   const res = await parser.parse(response)
   try {
     const title = res['global']['title'][0]
-    return title.split(":")[1].trim()
+    return title.split(':')[1].trim()
   } catch (e) {
     throw new Error('failed to parse svg: ' + JSON.stringify(res))
   }
@@ -60,13 +60,19 @@ export async function handleScore(request: Request) {
     params.ecosystem = ecoNamesFromDependabot[params.ecosystem]
   }
 
-  const reqURL = 'https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=' +
-    params.package + '&package-manager=' + params.ecosystem + '&previous-version=' +
-    params.oldver + '&new-version=' + params.newver
+  const reqURL =
+    'https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=' +
+    params.package +
+    '&package-manager=' +
+    params.ecosystem +
+    '&previous-version=' +
+    params.oldver +
+    '&new-version=' +
+    params.newver
 
-  const response = await fetchURL(reqURL);
-  const res = await parseSVG(response);
+  const response = await fetchURL(reqURL)
+  const res = await parseSVG(response)
   return generateJSONResponse({
-    "data": res
+    data: res,
   })
 }

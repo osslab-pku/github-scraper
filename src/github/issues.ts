@@ -1,7 +1,8 @@
-import { generateJSONResponse, generateErrorResponse } from '../common/response';
+import { generateJSONResponse, generateErrorResponse } from '../common/response'
 import { fieldMap, HTMLParser } from '../common/htmlparser'
 import { fetchURL, getParams, Optional } from '../common/request'
-import { Request } from 'itty-router';
+import { OpenAPIRoute } from 'chanfana'
+import { z } from 'zod'
 
 /**
  * Issue Request should look like this
@@ -9,25 +10,25 @@ import { Request } from 'itty-router';
  */
 
 type IssueRequest = {
-  owner: string,
-  name: string,
-  query?: string,
-  maxPages?: number,
+  owner: string
+  name: string
+  query?: string
+  maxPages?: number
   fromPage?: number
 }
 
 const sampleIssuesRequest: IssueRequest = {
-  name: "PyGitHub",
-  owner: "PyGitHub",
-  query: "is:pr author:dependabot[bot]",
+  name: 'PyGitHub',
+  owner: 'PyGitHub',
+  query: 'is:pr author:dependabot[bot]',
   maxPages: 10,
-  fromPage: 1
+  fromPage: 1,
 }
 
 const defaultIssuesRequest: Optional<IssueRequest> = {
   maxPages: 1,
   fromPage: 1,
-  query: ""
+  query: '',
 }
 
 /**
@@ -36,152 +37,185 @@ const defaultIssuesRequest: Optional<IssueRequest> = {
  * @returns {Promise<{}>} res
  */
 async function parseIssues(response: Response): Promise<{}> {
-  const parser = new HTMLParser();
+  const parser = new HTMLParser()
 
   // set issue id
-  parser.addKeyParser('.js-issue-row', (element, key)=>{
-    const id = element.getAttribute('id');
-    if(id === null){
-      throw new Error("missing id in js-issue-row");
+  parser.addKeyParser('.js-issue-row', (element, key) => {
+    const id = element.getAttribute('id')
+    if (id === null) {
+      throw new Error('missing id in js-issue-row')
     }
-    const matches = id.match(/(\d+)/g);
-    if (!matches) return key;
-    return matches.pop();
+    const matches = id.match(/(\d+)/g)
+    if (!matches) return key
+    return matches.pop()
   })
 
   // set title
-  parser.addTextParser('title','.markdown-title');
+  parser.addTextParser('title', '.markdown-title')
   // set author
-  parser.addTextParser('author', '.opened-by [data-hovercard-type="user"]');
-  parser.addTextParser('bot', '.opened-by a[href]:not([data-hovercard-type="user"])')
+  parser.addTextParser('author', '.opened-by [data-hovercard-type="user"]')
+  parser.addTextParser(
+    'bot',
+    '.opened-by a[href]:not([data-hovercard-type="user"])',
+  )
   // set actedAt
-  parser.addAttributeParser('actedAt', 'relative-time', 'datetime');
+  parser.addAttributeParser('actedAt', 'relative-time', 'datetime')
 
   // checks
-  parser.addAttributeParser('check', '.color-fg-danger[aria-label*="heck"]', 'aria-label');
-  parser.addAttributeParser('check', '.color-fg-success[aria-label*="heck"]', 'aria-label');
+  parser.addAttributeParser(
+    'check',
+    '.color-fg-danger[aria-label*="heck"]',
+    'aria-label',
+  )
+  parser.addAttributeParser(
+    'check',
+    '.color-fg-success[aria-label*="heck"]',
+    'aria-label',
+  )
 
   // checkStatus
   parser.addCaseParser('checkStatus', {
     '.color-fg-danger[aria-label*="heck"]': 'failed',
-    '.color-fg-success[aria-label*="heck"]': 'passed'
+    '.color-fg-success[aria-label*="heck"]': 'passed',
   })
 
   // state
   parser.addCaseParser('state', {
     '[aria-label~="Open"]': 'open',
     '[aria-label~="Closed"]': 'closed',
-    '[aria-label~="Merged"]': 'merged'
+    '[aria-label~="Merged"]': 'merged',
   })
 
   // labels
-  parser.addTextParser('labels', 'a.IssueLabel');
+  parser.addTextParser('labels', 'a.IssueLabel')
 
   // set next
-  parser.addAttributeParser('next', '.next_page', 'href', 'pagination');
+  parser.addAttributeParser('next', '.next_page', 'href', 'pagination')
   // set total
-  parser.addAttributeParser('total', 'em.current', 'data-total-pages', 'pagination');
+  parser.addAttributeParser(
+    'total',
+    'em.current',
+    'data-total-pages',
+    'pagination',
+  )
   // set current
-  parser.addTextParser('current', 'em.current', 'pagination');
+  parser.addTextParser('current', 'em.current', 'pagination')
 
-  let res = await parser.parse(response);
+  let res = await parser.parse(response)
 
   // transform results
-  res = fieldMap(res, 'title', v => v.join(''));
-  res = fieldMap(res, 'author', v => v.join(''));
-  res = fieldMap(res, 'bot', v => v.join(''));
-  res = fieldMap(res, 'actedAt', v => v.join(''));
-  res = fieldMap(res, 'check', v => v.join(''));
-  res = fieldMap(res, 'checkStatus', v => v.join(''));
-  res = fieldMap(res, 'next', v => v.join(''));
-  res = fieldMap(res, 'total', v => v.join(''));
-  res = fieldMap(res, 'current', v => v.join(''));
-  res = fieldMap(res, 'state', v => v.join(''));
-  res = fieldMap(res, 'labels', v => v.map(t => t.trim()));
+  res = fieldMap(res, 'title', (v) => v.join(''))
+  res = fieldMap(res, 'author', (v) => v.join(''))
+  res = fieldMap(res, 'bot', (v) => v.join(''))
+  res = fieldMap(res, 'actedAt', (v) => v.join(''))
+  res = fieldMap(res, 'check', (v) => v.join(''))
+  res = fieldMap(res, 'checkStatus', (v) => v.join(''))
+  res = fieldMap(res, 'next', (v) => v.join(''))
+  res = fieldMap(res, 'total', (v) => v.join(''))
+  res = fieldMap(res, 'current', (v) => v.join(''))
+  res = fieldMap(res, 'state', (v) => v.join(''))
+  res = fieldMap(res, 'labels', (v) => v.map((t) => t.trim()))
 
   // parse check text
-  res = fieldMap(res, 'check', v => {
+  res = fieldMap(res, 'check', (v) => {
     const matches = v.match(/(\d+)/g)
     if (matches && matches.length === 2) {
       if (matches[0] === matches[1]) {
         return {
-          "status": "passed",
-          "total": parseInt(matches[1]),
-          "passed": parseInt(matches[0])
+          status: 'passed',
+          total: parseInt(matches[1]),
+          passed: parseInt(matches[0]),
         }
       } else {
         return {
-          "status": "failed",
-          "total": parseInt(matches[1]),
-          "passed": parseInt(matches[0])
+          status: 'failed',
+          total: parseInt(matches[1]),
+          passed: parseInt(matches[0]),
         }
       }
-    } else return {
-      "unknown": v
-    };
-  });
-  return res;
+    } else
+      return {
+        unknown: v,
+      }
+  })
+  return res
 }
 
+export async function handleIssues(request: Request) {
+  const { url } = request
+  const urlObject = new URL(url)
+  const params = getParams<IssueRequest>(
+    request,
+    sampleIssuesRequest,
+    defaultIssuesRequest,
+  )
 
-export async function handleIssues(request: Request){
-  const { url } = request;
-  const urlObject = new URL(url);
-  const params = getParams<IssueRequest>(request, sampleIssuesRequest, defaultIssuesRequest);
-
-  let queryComponent = null;
-  if (urlObject.pathname.includes("issues")){
-    queryComponent = "/issues?";
-    (params.query) || (params.query = "is:issue");
-  } else if (urlObject.pathname.includes("pulls")){
-    queryComponent = "/pulls?";
-    (params.query) || (params.query = "is:pr");
+  let queryComponent = null
+  if (urlObject.pathname.includes('issues')) {
+    queryComponent = '/issues?'
+    params.query || (params.query = 'is:issue')
+  } else if (urlObject.pathname.includes('pulls')) {
+    queryComponent = '/pulls?'
+    params.query || (params.query = 'is:pr')
   } else {
-    throw new Error("Request is not issues or pulls");
+    throw new Error('Request is not issues or pulls')
   }
 
-  const reqURL = "https://github.com/" + params.owner + "/" + params.name + queryComponent
-    + "page=" + params.fromPage + "&q=" + encodeURIComponent(params.query);
+  const reqURL =
+    'https://github.com/' +
+    params.owner +
+    '/' +
+    params.name +
+    queryComponent +
+    'page=' +
+    params.fromPage +
+    '&q=' +
+    encodeURIComponent(params.query)
   // console.log(reqURL);
-  const response = await fetchURL(reqURL);
-  let pageCount = 1;
-  let res = await parseIssues(response);
+  const response = await fetchURL(reqURL)
+  let pageCount = 1
+  let res = await parseIssues(response)
 
-  const full_res = {...res};
+  const full_res = { ...res }
 
-  while("pagination" in res && "next" in res["pagination"] && res["pagination"]["next"]
-  && pageCount < params.maxPages){
+  while (
+    'pagination' in res &&
+    'next' in res['pagination'] &&
+    res['pagination']['next'] &&
+    pageCount < params.maxPages
+  ) {
     // page limit: to control cpu time
-    const reqURL = "https://github.com" + res["pagination"]["next"];
+    const reqURL = 'https://github.com' + res['pagination']['next']
     // console.log(reqURL);
-    const response = await fetchURL(reqURL);
-    res = await parseIssues(response);
+    const response = await fetchURL(reqURL)
+    res = await parseIssues(response)
     // merge object res
-    Object.assign(full_res, full_res, res);
-    pageCount += 1;
+    Object.assign(full_res, full_res, res)
+    pageCount += 1
   }
 
   // transform
-  const ret = { "data": [], "url": reqURL };
-  if("pagination" in full_res) {
-    ret["total"] = full_res["pagination"]["total"];
-    ret["current"] = full_res["pagination"]["current"];
-    if (full_res["pagination"]["next"]){ // no null
-      ret["next"] = "https://github.com" + full_res["pagination"]["next"];
+  const ret = { data: [], url: reqURL }
+  if ('pagination' in full_res) {
+    ret['total'] = full_res['pagination']['total']
+    ret['current'] = full_res['pagination']['current']
+    if (full_res['pagination']['next']) {
+      // no null
+      ret['next'] = 'https://github.com' + full_res['pagination']['next']
     }
   }
 
-  for(let entry in full_res){
-    if(entry === "pagination") continue;
-    if(entry === "$keyIsNull") {
-      ret["uncollected"] = full_res[entry];
-      continue;
+  for (let entry in full_res) {
+    if (entry === 'pagination') continue
+    if (entry === '$keyIsNull') {
+      ret['uncollected'] = full_res[entry]
+      continue
     }
-    ret["data"].push({
-      "id": parseInt(entry),
-      ...full_res[entry]
+    ret['data'].push({
+      id: parseInt(entry),
+      ...full_res[entry],
     })
   }
 
-  return generateJSONResponse(ret);
+  return generateJSONResponse(ret)
 }

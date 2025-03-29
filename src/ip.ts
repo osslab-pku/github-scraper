@@ -1,10 +1,29 @@
-import { generateJSONResponse } from './common/response'
+import { OpenAPIRoute } from 'chanfana'
+import { z } from 'zod'
 
-export async function handleIP(request: Request) {
-  const cfProperties = request.cf
-  const response = await fetch("http://ifconfig.me/ip")
-  return generateJSONResponse({
-    "workerIp": await response.text(),
-    "requestProps": cfProperties
-  })
+export class GetIP extends OpenAPIRoute {
+  schema = {
+    responses: {
+      '200': {
+        description: 'Successful response',
+        content: {
+          'application/json': {
+            schema: z.object({
+              workerIp: z.string(),
+              requestProps: z.custom<CfProperties>(),
+            }),
+          },
+        },
+      },
+    },
+  }
+
+  async handle(request: Request, env: Env, context: ExecutionContext) {
+    const cfProperties = request.cf
+    const response = await fetch('http://ifconfig.me/ip')
+    return {
+      workerIp: await response.text(),
+      requestProps: cfProperties,
+    }
+  }
 }
