@@ -1,4 +1,4 @@
-import { StatusError } from 'itty-router'
+import { error } from 'itty-router'
 
 type OptionalKeys<T> = {
   [K in keyof T]-?: {} extends Pick<T, K> ? K : never
@@ -17,7 +17,7 @@ export const fetchURL = async (
   try {
     const response = await fetch(url, options)
     if (response.status !== 200) {
-      throw new StatusError(500, {
+      return error(500, {
         error: `Fetched ${url} failed with status code ${response.status}`,
         response: await response.text(),
       })
@@ -25,11 +25,11 @@ export const fetchURL = async (
     return response
   } catch (e) {
     if (e instanceof Error) {
-      throw new StatusError(500, {
+      return error(500, {
         error: `Fetched ${url} failed with error ${e.message}`,
       })
     }
-    throw new StatusError(500, {
+    return error(500, {
       error: `Fetched ${url} failed with unknown error`,
     })
   }

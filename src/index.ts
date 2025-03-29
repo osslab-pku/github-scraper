@@ -1,51 +1,38 @@
-import { json, RouteEntry, Router, StatusError } from 'itty-router'
+import { error, json, RouteEntry, Router } from 'itty-router'
 import { fromIttyRouter, OpenAPIRoute } from 'chanfana'
 import { z } from 'zod'
-import { generateJSONResponse, generateErrorResponse } from './common/response'
 
-import { checkAuth } from './auth'
+import { authorized } from './auth'
 import { GetIP } from './ip'
-
-import { handleTimeline } from './github/timeline'
-import { handleIssues } from './github/issues'
-import { handleScore } from './dependabot/score'
+import { GetIssueTimeline } from './github/timeline'
+import { GetIssues } from './github/issues'
 import { GetDependents } from './github/dependents'
-
-type RouterHandler = (request?: Request) => Promise<Response>
-
-const withAuth = (fn: RouterHandler) => {
-  return async (request: Request) => {
-    if (checkAuth(request)) {
-      try {
-        return await fn(request)
-      } catch (e) {
-        return generateErrorResponse(e)
-      }
-    } else {
-      return generateErrorResponse(
-        'Not authorized: check `Authorization` header',
-        401,
-      )
-    }
-  }
-}
+import { GetGitRefs } from './git/refs'
+import { GetGitlabRepos } from './gitlab/repos'
+import { GetGitlabRepoCount } from './gitlab/repoCount'
+import { GetDependabotScore } from './dependabot/score'
 
 const router = Router()
 
-router.get('/github/issues', withAuth(handleIssues))
-router.get('/github/pulls', withAuth(handleIssues))
-router.get('/github/issue', withAuth(handleTimeline))
-router.get('/github/pull', withAuth(handleTimeline))
-
-router.get('/github/:owner/:name/issues', withAuth(handleIssues))
-router.get('/github/:owner/:name/pulls', withAuth(handleIssues))
-router.get('/github/:owner/:name/issues/:id', withAuth(handleTimeline))
-router.get('/github/:owner/:name/pull/:id', withAuth(handleTimeline))
-
-router.get('/dependabot/score', withAuth(handleScore))
+const openapi = fromIttyRouter(router, {
+  docs_url: '/',
+})
+openapi.registry.registerComponent('securitySchemes', 'bearerAuth', {
+  type: 'http',
+  scheme: 'bearer',
+  bearerFormat: 'JWT',
+})
+openapi.get('/ip', authorized(GetIP))
+openapi.get('/github/dependents', authorized(GetDependents))
+openapi.get('/github/issues', authorized(GetIssues))
+openapi.get('/github/issue', authorized(GetIssueTimeline))
+openapi.get('/git/refs', authorized(GetGitRefs))
+openapi.get('/gitlab/repos', authorized(GetGitlabRepos))
+openapi.get('/gitlab/repos/count', authorized(GetGitlabRepoCount))
+openapi.get('/dependabot/score', authorized(GetDependabotScore))
 
 router.all('*', () => {
-  throw new StatusError(404, {
+  return error(404, {
     error: 'Not Found',
     endpoints: router.routes.map((route) => ({
       method: route[0],
@@ -53,11 +40,5 @@ router.all('*', () => {
     })),
   })
 })
-
-const openapi = fromIttyRouter(router, {
-  docs_url: '/',
-})
-openapi.get('/ip', GetIP)
-openapi.get('/github/dependents', GetDependents)
 
 export default router

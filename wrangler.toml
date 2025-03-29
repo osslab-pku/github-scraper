@@ -2,8 +2,10 @@ name = "scraper"
 compatibility_date = "2025-03-21"
 main = "src/index.ts"
 
+compatibility_flags = ["nodejs_compat"]
+
 [observability]
 enabled = true
 
-[browser] 
-binding = "BROWSER"
+# [browser] 
+# binding = "BROWSER"

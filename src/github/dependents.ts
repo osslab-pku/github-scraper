@@ -1,29 +1,27 @@
-import { StatusError } from 'itty-router'
 import { fieldMap, HTMLParser } from '../common/htmlparser'
-import { fetchURL, getParams, Optional } from '../common/request'
+import { fetchURL } from '../common/request'
 import { OpenAPIRoute, Str, Num } from 'chanfana'
 import { z } from 'zod'
 
 const DependentsRequestSchema = z.object({
   name: Str({
     description: 'name of the repository',
-    example: 'PyGitHub',
+    example: 'tensorflow',
   }).optional(),
   owner: Str({
     description: 'name of the user or organization',
-    example: 'PyGitHub',
+    example: 'tensorflow',
   }).optional(),
   type: z.enum(['REPOSITORY', 'PACKAGE']).default('REPOSITORY'),
   packageId: Str({
     description:
       'PackageId. You can click the package button on the dependents page and find it in the URL.',
-    example: 'UGFja2FnZS0yODI3ODQ2MzYx',
-    required: false,
+    example: 'UGFja2FnZS01MjcyNjAxNg',
   }).optional(),
   maxPages: Num({
     description:
       'Number of pages to fetch. Set it moderate to avoid triggering the rate limit.',
-    example: 'MjA4OTk4ODI3NjA',
+    example: 10,
   })
     .min(1)
     .max(10)
@@ -121,10 +119,9 @@ const DependentSchema = z.object({
 
 const DependentsResponseSchema = z.object({
   data: z.array(DependentSchema),
-  pagination: z.object({
-    after: z.string(),
-    next: z.string(),
-  }),
+  url: z.string(),
+  next: z.string().optional(),
+  after: z.string().optional(),
 })
 
 export class GetDependents extends OpenAPIRoute {
@@ -137,10 +134,7 @@ export class GetDependents extends OpenAPIRoute {
         description: 'Successful response',
         content: {
           'application/json': {
-            schema: z.object({
-              workerIp: z.string(),
-              requestProps: z.custom<CfProperties>(),
-            }),
+            schema: DependentsResponseSchema,
           },
         },
       },

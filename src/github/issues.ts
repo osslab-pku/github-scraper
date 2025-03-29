@@ -1,21 +1,36 @@
-import { generateJSONResponse, generateErrorResponse } from '../common/response'
 import { fieldMap, HTMLParser } from '../common/htmlparser'
 import { fetchURL, getParams, Optional } from '../common/request'
-import { OpenAPIRoute } from 'chanfana'
+import { Num, OpenAPIRoute, Str } from 'chanfana'
 import { z } from 'zod'
 
 /**
  * Issue Request should look like this
  * @type {{owner: string, query: string, maxPages: number, name: string}}
  */
+const IssueRequestSchema = z.object({
+  owner: Str({
+    description: 'name of the user or organization',
+    example: 'PyGitHub',
+  }),
+  name: Str({
+    description: 'name of the repository',
+    example: 'PyGitHub',
+  }),
+  query: Str({
+    description: 'search query for filtering issues',
+    example: 'is:pr author:dependabot[bot]',
+  }).optional(),
+  maxPages: Num({
+    description: 'number of pages to fetch',
+    example: 10,
+  }).optional(),
+  fromPage: Num({
+    description: 'page number to start fetching from',
+    example: 1,
+  }).optional(),
+})
 
-type IssueRequest = {
-  owner: string
-  name: string
-  query?: string
-  maxPages?: number
-  fromPage?: number
-}
+type IssueRequest = z.infer<typeof IssueRequestSchema>
 
 const sampleIssuesRequest: IssueRequest = {
   name: 'PyGitHub',
@@ -31,12 +46,41 @@ const defaultIssuesRequest: Optional<IssueRequest> = {
   query: '',
 }
 
+const IssueEntrySchema = z.object({
+  title: z.string(),
+  author: z.string(),
+  bot: z.string(),
+  actedAt: z.string(),
+  check: z
+    .object({
+      status: z.enum(['passed', 'failed']),
+      total: z.number(),
+      passed: z.number(),
+    })
+    .optional(),
+  checkStatus: z.enum(['passed', 'failed']).optional(),
+  state: z.enum(['open', 'closed', 'merged']),
+  labels: z.array(z.string()),
+})
+
+const IssueResponseSchema = z.object({
+  data: z.array(IssueEntrySchema),
+  next: z.string().nullable(),
+  total: z.string(),
+  current: z.string(),
+  url: z.string(),
+  $keyIsNull: z.array(z.unknown()).optional(),
+})
+
+type IssueEntry = z.infer<typeof IssueEntrySchema>
+type IssueResponse = z.infer<typeof IssueResponseSchema>
+
 /**
  * parse Issues List and return results
  * @param response
  * @returns {Promise<{}>} res
  */
-async function parseIssues(response: Response): Promise<{}> {
+async function parseIssues(response: Response): Promise<IssueEntry> {
   const parser = new HTMLParser()
 
   // set issue id
@@ -90,16 +134,11 @@ async function parseIssues(response: Response): Promise<{}> {
   parser.addTextParser('labels', 'a.IssueLabel')
 
   // set next
-  parser.addAttributeParser('next', '.next_page', 'href', 'pagination')
-  // set total
-  parser.addAttributeParser(
-    'total',
-    'em.current',
-    'data-total-pages',
-    'pagination',
-  )
+  parser.addAttributeParser('next', 'a[rel="next"]', 'href', 'pagination')
+
+  parser.addTextParser('total', 'a[aria-label^="Page"]', 'pagination')
   // set current
-  parser.addTextParser('current', 'em.current', 'pagination')
+  parser.addTextParser('current', 'a[aria-current="page"]', 'pagination')
 
   let res = await parser.parse(response)
 
@@ -133,89 +172,103 @@ async function parseIssues(response: Response): Promise<{}> {
           passed: parseInt(matches[0]),
         }
       }
-    } else
-      return {
-        unknown: v,
-      }
+    } else return undefined
   })
+
   return res
 }
 
-export async function handleIssues(request: Request) {
-  const { url } = request
-  const urlObject = new URL(url)
-  const params = getParams<IssueRequest>(
-    request,
-    sampleIssuesRequest,
-    defaultIssuesRequest,
-  )
-
-  let queryComponent = null
-  if (urlObject.pathname.includes('issues')) {
-    queryComponent = '/issues?'
-    params.query || (params.query = 'is:issue')
-  } else if (urlObject.pathname.includes('pulls')) {
-    queryComponent = '/pulls?'
-    params.query || (params.query = 'is:pr')
-  } else {
-    throw new Error('Request is not issues or pulls')
+export class GetIssues extends OpenAPIRoute {
+  schema = {
+    request: {
+      query: IssueRequestSchema,
+    },
+    responses: {
+      '200': {
+        description: 'Successful response',
+        content: {
+          'application/json': {
+            schema: IssueResponseSchema,
+          },
+        },
+      },
+    },
   }
 
-  const reqURL =
-    'https://github.com/' +
-    params.owner +
-    '/' +
-    params.name +
-    queryComponent +
-    'page=' +
-    params.fromPage +
-    '&q=' +
-    encodeURIComponent(params.query)
-  // console.log(reqURL);
-  const response = await fetchURL(reqURL)
-  let pageCount = 1
-  let res = await parseIssues(response)
+  async handle(request: Request, env: Env, ctx: ExecutionContext) {
+    const params = (await this.getValidatedData<typeof this.schema>()).query
 
-  const full_res = { ...res }
+    // let queryComponent = null
+    // if (urlObject.pathname.includes('issues')) {
+    //   queryComponent = '/issues?'
+    //   params.query || (params.query = 'is:issue')
+    // } else if (urlObject.pathname.includes('pulls')) {
+    //   queryComponent = '/pulls?'
+    //   params.query || (params.query = 'is:pr')
+    // } else {
+    //   throw new Error('Request is not issues or pulls')
+    // }
 
-  while (
-    'pagination' in res &&
-    'next' in res['pagination'] &&
-    res['pagination']['next'] &&
-    pageCount < params.maxPages
-  ) {
-    // page limit: to control cpu time
-    const reqURL = 'https://github.com' + res['pagination']['next']
-    // console.log(reqURL);
+    const reqURL =
+      'https://github.com/' +
+      params.owner +
+      '/' +
+      params.name +
+      '/issues?' +
+      'page=' +
+      params.fromPage +
+      '&q=' +
+      encodeURIComponent(params.query)
+    console.log(reqURL)
     const response = await fetchURL(reqURL)
-    res = await parseIssues(response)
-    // merge object res
-    Object.assign(full_res, full_res, res)
-    pageCount += 1
-  }
+    let pageCount = 1
+    let res = await parseIssues(response)
 
-  // transform
-  const ret = { data: [], url: reqURL }
-  if ('pagination' in full_res) {
-    ret['total'] = full_res['pagination']['total']
-    ret['current'] = full_res['pagination']['current']
-    if (full_res['pagination']['next']) {
-      // no null
-      ret['next'] = 'https://github.com' + full_res['pagination']['next']
+    const full_res = { ...res }
+
+    while (
+      typeof res === 'object' &&
+      res !== null &&
+      'pagination' in res &&
+      typeof res.pagination === 'object' &&
+      res.pagination !== null &&
+      'next' in res.pagination &&
+      res.pagination.next &&
+      pageCount < params.maxPages
+    ) {
+      // page limit: to control cpu time
+      const reqURL = 'https://github.com' + res['pagination']['next']
+      // console.log(reqURL);
+      const response = await fetchURL(reqURL)
+      res = await parseIssues(response)
+      // merge object res
+      Object.assign(full_res, full_res, res)
+      pageCount += 1
     }
-  }
 
-  for (let entry in full_res) {
-    if (entry === 'pagination') continue
-    if (entry === '$keyIsNull') {
-      ret['uncollected'] = full_res[entry]
-      continue
+    // transform
+    const ret = { data: [], url: reqURL }
+    if ('pagination' in full_res) {
+      ret['total'] = full_res['pagination']['total']
+      ret['current'] = full_res['pagination']['current']
+      if (full_res['pagination']['next']) {
+        // no null
+        ret['next'] = 'https://github.com' + full_res['pagination']['next']
+      }
     }
-    ret['data'].push({
-      id: parseInt(entry),
-      ...full_res[entry],
-    })
-  }
 
-  return generateJSONResponse(ret)
+    for (let entry in full_res) {
+      if (entry === 'pagination') continue
+      if (entry === '$keyIsNull') {
+        ret['uncollected'] = full_res[entry]
+        continue
+      }
+      ret['data'].push({
+        id: parseInt(entry),
+        ...full_res[entry],
+      })
+    }
+
+    return ret
+  }
 }

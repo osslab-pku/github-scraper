@@ -73,7 +73,7 @@ export class HTMLParser {
           const key = overrideKey ? overrideKey : parser.key
           key in parser.res || (parser.res[key] = {})
           name in parser.res[key] || (parser.res[key][name] = [])
-          parser.res[key][name].push(decode(text))
+          parser.res[key][name].push(decodeURIComponent(text))
           text = ''
         }
       },

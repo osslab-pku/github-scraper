@@ -8,7 +8,14 @@ wasm-pack.log
 worker/
 node_modules/
 .cargo-ok
+*.py[cod]
+*.so
 
 .idea/
 .vscode/
 .DS_Store
+
+.wrangler/
+.dev.vars
+
+*.csv

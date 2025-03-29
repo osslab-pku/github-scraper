@@ -16,6 +16,7 @@ export class GetIP extends OpenAPIRoute {
         },
       },
     },
+    security: [{ bearerAuth: [] }],
   }
 
   async handle(request: Request, env: Env, context: ExecutionContext) {

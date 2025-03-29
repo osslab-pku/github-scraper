@@ -1,20 +1,14 @@
 import { fetchURL, getParams } from '../common/request'
 import { HTMLParser } from '../common/htmlparser'
-import { generateJSONResponse } from '../common/response'
+import { OpenAPIRoute, Str, Num, Arr } from 'chanfana'
+import { z } from 'zod'
 
-type ScoreRequest = {
-  package: string
-  ecosystem: string
-  oldver: string
-  newver: string
-}
-
-const sampleScoreRequest: ScoreRequest = {
-  package: 'lodash',
-  ecosystem: 'npm',
-  oldver: '1.14.0',
-  newver: '1.15.0',
-}
+const ScoreRequestSchema = z.object({
+  package: Str({ example: 'lodash' }),
+  ecosystem: Str({ example: 'npm' }),
+  oldver: Str({ example: '1.14.0' }),
+  newver: Str({ example: '1.15.0' }),
+})
 
 const ecoNamesFromDependabot = {
   bundler: 'bundler',
@@ -46,33 +40,52 @@ async function parseSVG(response: Response): Promise<string> {
   }
 }
 
-export async function handleScore(request: Request) {
-  const { url } = request
-
-  const params = getParams<ScoreRequest>(request, sampleScoreRequest)
-
-  const allowedEco = Object.values(ecoNamesFromDependabot)
-  const mappedEco = Object.keys(ecoNamesFromDependabot)
-  if (allowedEco.indexOf(params.ecosystem) === -1) {
-    if (mappedEco.indexOf(params.ecosystem) === -1) {
-      throw new Error('ecosystem `' + params.ecosystem + '` is not valid')
-    }
-    params.ecosystem = ecoNamesFromDependabot[params.ecosystem]
+export class GetDependabotScore extends OpenAPIRoute {
+  schema = {
+    request: {
+      query: ScoreRequestSchema,
+    },
+    responses: {
+      '200': {
+        description: 'Successful response',
+        content: {
+          'application/json': {
+            schema: z.object({
+              data: z.string(),
+            }),
+          },
+        },
+      },
+    },
   }
+  async handle(request: Request, env: Env, ctx: ExecutionContext) {
+    const params = (await this.getValidatedData<typeof this.schema>()).query
 
-  const reqURL =
-    'https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=' +
-    params.package +
-    '&package-manager=' +
-    params.ecosystem +
-    '&previous-version=' +
-    params.oldver +
-    '&new-version=' +
-    params.newver
+    const allowedEco = Object.values(ecoNamesFromDependabot)
+    const mappedEco = Object.keys(ecoNamesFromDependabot)
+    if (allowedEco.indexOf(params.ecosystem) === -1) {
+      if (mappedEco.indexOf(params.ecosystem) === -1) {
+        throw new Error('ecosystem `' + params.ecosystem + '` is not valid')
+      }
+      params.ecosystem = ecoNamesFromDependabot[params.ecosystem]
+    }
 
-  const response = await fetchURL(reqURL)
-  const res = await parseSVG(response)
-  return generateJSONResponse({
-    data: res,
-  })
+    const reqURL =
+      'https://dependabot-badges.githubapp.com/badges/compatibility_score?dependency-name=' +
+      params.package +
+      '&package-manager=' +
+      params.ecosystem +
+      '&previous-version=' +
+      params.oldver +
+      '&new-version=' +
+      params.newver
+
+    console.log(reqURL)
+
+    const response = await fetchURL(reqURL)
+    const res = await parseSVG(response)
+    return {
+      data: res,
+    }
+  }
 }
