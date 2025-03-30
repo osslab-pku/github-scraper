@@ -198,23 +198,23 @@ export class GetIssues extends OpenAPIRoute {
   async handle(request: Request, env: Env, ctx: ExecutionContext) {
     const params = (await this.getValidatedData<typeof this.schema>()).query
 
-    // let queryComponent = null
-    // if (urlObject.pathname.includes('issues')) {
-    //   queryComponent = '/issues?'
-    //   params.query || (params.query = 'is:issue')
-    // } else if (urlObject.pathname.includes('pulls')) {
-    //   queryComponent = '/pulls?'
-    //   params.query || (params.query = 'is:pr')
-    // } else {
-    //   throw new Error('Request is not issues or pulls')
-    // }
+    let queryComponent = null
+    if (request.url.includes('issues')) {
+      queryComponent = '/issues?'
+      params.query || (params.query = 'is:issue')
+    } else if (request.url.includes('pulls')) {
+      queryComponent = '/pulls?'
+      params.query || (params.query = 'is:pr')
+    } else {
+      throw new Error('Request is not issues or pulls')
+    }
 
     const reqURL =
       'https://github.com/' +
       params.owner +
       '/' +
       params.name +
-      '/issues?' +
+      queryComponent +
       'page=' +
       params.fromPage +
       '&q=' +

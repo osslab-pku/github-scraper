@@ -1,9 +1,12 @@
-import { error } from 'itty-router'
+import { error, StatusError } from 'itty-router'
+import { getRandomUA } from './ua'
 
 type OptionalKeys<T> = {
   [K in keyof T]-?: {} extends Pick<T, K> ? K : never
 }[keyof T]
 export type Optional<T> = Pick<T, OptionalKeys<T>>
+
+const ua = getRandomUA()
 
 /**
  * handle exception in fetch
@@ -15,21 +18,28 @@ export const fetchURL = async (
   options?: RequestInit<RequestInitCfProperties>,
 ): Promise<Response> => {
   try {
-    const response = await fetch(url, options)
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'User-Agent': ua,
+        ...options?.headers,
+      },
+    })
     if (response.status !== 200) {
-      return error(500, {
-        error: `Fetched ${url} failed with status code ${response.status}`,
-        response: await response.text(),
+      throw new StatusError(500, {
+        error: `Fetched ${url} failed with status code ${
+          response.status
+        } ${await response.text()}`,
       })
     }
     return response
   } catch (e) {
     if (e instanceof Error) {
-      return error(500, {
+      throw new StatusError(500, {
         error: `Fetched ${url} failed with error ${e.message}`,
       })
     }
-    return error(500, {
+    throw new StatusError(500, {
       error: `Fetched ${url} failed with unknown error`,
     })
   }
