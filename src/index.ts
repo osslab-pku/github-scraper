@@ -1,6 +1,5 @@
-import { error, json, RouteEntry, Router } from 'itty-router'
-import { fromIttyRouter, OpenAPIRoute } from 'chanfana'
-import { z } from 'zod'
+import { error, Router, cors } from 'itty-router'
+import { fromIttyRouter } from 'chanfana'
 
 import { authorized } from './auth'
 import { GetIP } from './ip'
@@ -11,9 +10,11 @@ import { GetGitRefs } from './git/refs'
 import { GetGitlabRepos } from './gitlab/repos'
 import { GetGitlabRepoCount } from './gitlab/repoCount'
 import { GetDependabotScore } from './dependabot/score'
-import { GetGithubRepos } from 'github/repos'
+import { GetGithubRepos } from './github/repos'
 
+const { preflight, corsify } = cors()
 const router = Router()
+router.all('*', preflight)
 
 const openapi = fromIttyRouter(router, {
   docs_url: '/',
@@ -53,4 +54,20 @@ router.all('*', () => {
   })
 })
 
-export default router
+export default {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext,
+  ): Promise<Response> {
+    return await router
+      .handle(request, env, ctx)
+      .catch((error_) => {
+        console.error(error_)
+        const resp = error(error_)
+        resp.headers.set('Cache-Control', 'max-age=0')
+        return resp
+      })
+      .then(corsify)
+  },
+}
