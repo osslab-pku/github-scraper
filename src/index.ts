@@ -11,6 +11,7 @@ import { GetGitlabRepos } from './gitlab/repos'
 import { GetGitlabRepoCount } from './gitlab/repoCount'
 import { GetDependabotScore } from './dependabot/score'
 import { GetGithubRepos } from './github/repos'
+import { GetPypiMaintainer } from './pypi/maintainer'
 
 const { preflight, corsify } = cors()
 const router = Router()
@@ -43,6 +44,7 @@ openapi.get('/git/refs', authorized(GetGitRefs))
 openapi.get('/gitlab/repos', authorized(GetGitlabRepos))
 openapi.get('/gitlab/repos/count', authorized(GetGitlabRepoCount))
 openapi.get('/dependabot/score', authorized(GetDependabotScore))
+openapi.get('/pypi/maintainer', authorized(GetPypiMaintainer))
 
 router.all('*', () => {
   return error(404, {
