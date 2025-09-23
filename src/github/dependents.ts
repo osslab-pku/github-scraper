@@ -33,7 +33,10 @@ async function parseDependents(
   response: Response,
 ): Promise<z.infer<typeof DependentsResponseSchema>> {
   const parser = new HTMLParser()
-
+  // get total number of repositories and packages
+  parser.addTextParser('repositories', 'div[role="status"] > a:nth-child(1)')
+  parser.addTextParser('packages', 'div[role="status"] > a:nth-child(2)')
+  
   // set Release id
   parser.addKeyParser('div.Box-row', (element, key) => {
     return typeof key !== 'number' ? 0 : key + 1
@@ -82,6 +85,37 @@ async function parseDependents(
   res = fieldMap(res, 'forks', (v) =>
     parseInt(v.join('').replace('\n', '').replace(',', '').trim()),
   )
+  res['total'] = {
+    packages: res['$keyIsNull']?.['packages']
+    ? parseInt(
+        res['$keyIsNull']?.['packages']
+          .join('')
+          .replace('\n', '')
+          .replace(',', '')
+          .trim()
+          .split(' ')[0],
+      )
+    : undefined,
+  repositories: res['$keyIsNull']?.['repositories']
+    ? parseInt(
+        res['$keyIsNull']?.['repositories']
+          .join('')
+          .replace('\n', '')
+          .replace(',', '')
+          .trim()
+          .split(' ')[0],
+      )
+    : undefined
+  }
+
+  // delete repositories and packages from $keyIsNull
+  if (res['$keyIsNull']) {
+    delete res['$keyIsNull']['repositories']
+    delete res['$keyIsNull']['packages']
+    if (Object.keys(res['$keyIsNull']).length === 0) {
+      delete res['$keyIsNull']
+    }
+  }
 
   if ('pagination' in res) {
     res['pagination']['next'] =
@@ -99,7 +133,6 @@ async function parseDependents(
       res['pagination']['after'] = matched[1]
     }
   }
-
   return res
 }
 
@@ -122,6 +155,10 @@ const DependentsResponseSchema = z.object({
   url: z.string(),
   next: z.string().optional(),
   after: z.string().optional(),
+  total: z.object({
+    repositories: z.number().optional(),
+    packages: z.number().optional(),
+  }).optional(),
 })
 
 export class GetDependents extends OpenAPIRoute {
@@ -180,6 +217,10 @@ export class GetDependents extends OpenAPIRoute {
         }),
       )
       Object.assign(full_res, full_res, res_mutated)
+      // add total if not exists
+      if (!('total' in full_res) && 'total' in res) {
+        full_res['total'] = res['total']
+      }
       pageCount += 1
     }
 
@@ -194,9 +235,16 @@ export class GetDependents extends OpenAPIRoute {
         ret['after'] = full_res['pagination']['after']
       }
     }
+    if ('total' in full_res) {
+      ret['total'] = full_res['total']
+    }
 
     for (let entry in full_res) {
-      if (entry === 'pagination') continue
+      if (entry === 'pagination' || entry === 'total') continue
+      // if entry is null or NaN, it is uncollected data
+      if (entry === null || isNaN(entry as any)) {
+        continue
+      }
       if (entry === '$keyIsNull') {
         ret['uncollected'] = full_res[entry]
         continue
